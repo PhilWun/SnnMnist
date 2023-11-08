@@ -6,7 +6,7 @@ Created on 15.12.2014
 import pickle
 
 import numpy as np
-import matplotlib.cm as cmap
+import matplotlib
 import time
 import os.path
 from struct import unpack
@@ -128,7 +128,7 @@ def plot_2d_input_weights():
     name = 'XeAe'
     weights = get_2d_input_weights()
     fig = b2.figure(fig_num, figsize = (18, 18))
-    im2 = b2.imshow(weights, interpolation = "nearest", vmin = 0, vmax = wmax_ee, cmap = cmap.get_cmap('hot_r'))
+    im2 = b2.imshow(weights, interpolation = "nearest", vmin = 0, vmax = wmax_ee, cmap = matplotlib.colormaps.get_cmap('hot_r'))
     b2.colorbar(im2)
     b2.title('weights of connection' + name)
     fig.canvas.draw()
