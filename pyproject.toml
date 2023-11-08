@@ -7,6 +7,8 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+brian2 = "^2.5.4"
+brian2tools = "^0.3"
 
 
 [build-system]
