@@ -3,15 +3,14 @@ Created on 15.12.2014
 
 @author: Peter U. Diehl
 """
+import os.path
 import pickle
-
-import numpy as np
 import matplotlib
 import time
-import os.path
 from struct import unpack
-from brian2 import *
+
 import brian2 as b2
+import numpy as np
 from brian2tools import *
 
 # specify the location of the MNIST data
@@ -445,7 +444,7 @@ for subgroup_n, name in enumerate(population_names):
 # ------------------------------------------------------------------------------
 pop_values = [0, 0, 0]
 for i, name in enumerate(input_population_names):
-    input_groups[name + "e"] = b2.PoissonGroup(n_input, 0 * Hz)
+    input_groups[name + "e"] = b2.PoissonGroup(n_input, 0 * b2.Hz)
     rate_monitors[name + "e"] = b2.PopulationRateMonitor(input_groups[name + "e"])
 
 for name in input_connection_names:
@@ -484,7 +483,7 @@ for name in input_connection_names:
 # run the simulation and set inputs
 # ------------------------------------------------------------------------------
 
-net = Network()
+net = b2.Network()
 for obj_list in [
     neuron_groups,
     input_groups,
@@ -508,8 +507,8 @@ if do_plot_performance:
         fig_num
     )
 for i, name in enumerate(input_population_names):
-    input_groups[name + "e"].rates = 0 * Hz
-net.run(0 * second)
+    input_groups[name + "e"].rates = 0 * b2.Hz
+net.run(0 * b2.second)
 j = 0
 while j < (int(num_examples)):
     if test_mode:
@@ -528,7 +527,7 @@ while j < (int(num_examples)):
         spike_rates = (
             training["x"][j % 60000, :, :].reshape((n_input)) / 8.0 * input_intensity
         )
-    input_groups["Xe"].rates = spike_rates * Hz
+    input_groups["Xe"].rates = spike_rates * b2.Hz
     #     print 'run number:', j+1, 'of', int(num_examples)
     net.run(single_example_time, report="text")
 
@@ -549,7 +548,7 @@ while j < (int(num_examples)):
     if np.sum(current_spike_count) < 5:
         input_intensity += 1
         for i, name in enumerate(input_population_names):
-            input_groups[name + "e"].rates = 0 * Hz
+            input_groups[name + "e"].rates = 0 * b2.Hz
         net.run(resting_time)
     else:
         result_monitor[j % update_interval, :] = current_spike_count
@@ -572,7 +571,7 @@ while j < (int(num_examples)):
                     performance[: (j / float(update_interval)) + 1],
                 )
         for i, name in enumerate(input_population_names):
-            input_groups[name + "e"].rates = 0 * Hz
+            input_groups[name + "e"].rates = 0 * b2.Hz
         net.run(resting_time)
         input_intensity = start_input_intensity
         j += 1
@@ -619,30 +618,30 @@ if spike_counters:
 
 plot_2d_input_weights()
 
-plt.figure(5)
+b2.plt.figure(5)
 
-subplot(3, 1, 1)
+b2.subplot(3, 1, 1)
 
 brian_plot(connections["XeAe"].w)
-subplot(3, 1, 2)
+b2.subplot(3, 1, 2)
 
 brian_plot(connections["AeAi"].w)
 
-subplot(3, 1, 3)
+b2.subplot(3, 1, 3)
 
 brian_plot(connections["AiAe"].w)
 
 
-plt.figure(6)
+b2.plt.figure(6)
 
-subplot(3, 1, 1)
+b2.subplot(3, 1, 1)
 
 brian_plot(connections["XeAe"].delay)
-subplot(3, 1, 2)
+b2.subplot(3, 1, 2)
 
 brian_plot(connections["AeAi"].delay)
 
-subplot(3, 1, 3)
+b2.subplot(3, 1, 3)
 
 brian_plot(connections["AiAe"].delay)
 
