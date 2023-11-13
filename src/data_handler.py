@@ -68,18 +68,20 @@ def get_labeled_data(pickle_file_name: str, b_train=True) -> LabeledData:
     return data
 
 
-def get_matrix_from_file(file_name: str, ending: str, n_input: int, n_e: int, n_i: int):
+def get_matrix_from_file(
+    file_name: Path, ending: str, n_input: int, n_e: int, n_i: int
+):
     offset = len(ending) + 4
 
-    if file_name[-4 - offset] == "X":
+    if file_name.name[-4 - offset] == "X":
         n_src = n_input
     else:
-        if file_name[-3 - offset] == "e":
+        if file_name.name[-3 - offset] == "e":
             n_src = n_e
         else:
             n_src = n_i
 
-    if file_name[-1 - offset] == "e":
+    if file_name.name[-1 - offset] == "e":
         n_tgt = n_e
     else:
         n_tgt = n_i
@@ -94,20 +96,20 @@ def get_matrix_from_file(file_name: str, ending: str, n_input: int, n_e: int, n_
     return value_arr
 
 
-def save_connections(save_conns, connections, data_path, ending=""):
+def save_connections(save_conns, connections, data_path: Path, ending=""):
     print("save connections")
 
     for connName in save_conns:
         conn = connections[connName]
-        connListSparse = np.stack([conn.i, conn.j, conn.w], axis=1)
-        np.save(data_path + "weights/" + connName + ending, connListSparse)
+        conn_list_sparse = np.stack([conn.i, conn.j, conn.w], axis=1)
+        np.save(data_path / "weights" / (connName + ending), conn_list_sparse)
 
 
-def save_theta(population_names, data_path, neuron_groups, ending=""):
+def save_theta(population_names, data_path: Path, neuron_groups, ending=""):
     print("save theta")
 
     for pop_name in population_names:
         np.save(
-            data_path + "weights/theta_" + pop_name + ending,
+            data_path / "weights" / ("theta_" + pop_name + ending),
             neuron_groups[pop_name + "e"].theta,
         )

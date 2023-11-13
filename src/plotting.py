@@ -54,6 +54,7 @@ def update_2d_input_weights(
     weights = get_2d_input_weights(n_input, n_e, connections)
     im.set_array(weights)
     fig.canvas.draw()
+
     return im
 
 
