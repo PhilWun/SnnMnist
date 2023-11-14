@@ -279,10 +279,10 @@ class Runner:
             ]
 
             self.neuron_groups[name + "e"].v = (
-                    self.neuron_model_hyperparameters.v_rest_e - 40.0 * b2.mV
+                self.neuron_model_hyperparameters.v_rest_e - 40.0 * b2.mV
             )
             self.neuron_groups[name + "i"].v = (
-                    self.neuron_model_hyperparameters.v_rest_i - 40.0 * b2.mV
+                self.neuron_model_hyperparameters.v_rest_i - 40.0 * b2.mV
             )
 
             if self.test_mode or str(self.weight_path)[-7:] == "weights":
