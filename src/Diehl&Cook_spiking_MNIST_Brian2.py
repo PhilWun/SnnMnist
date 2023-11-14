@@ -4,6 +4,7 @@ Created on 15.12.2014
 @author: Peter U. Diehl
 """
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
 
@@ -25,6 +26,31 @@ from src.plotting import (
 )
 
 
+@dataclass
+class NeuronModelHyperparameters:
+    v_rest_e: b2.Quantity
+    v_rest_i: b2.Quantity
+    v_reset_e: b2.Quantity
+    v_reset_i: b2.Quantity
+    v_thresh_e: b2.Quantity
+    v_thresh_i: b2.Quantity
+    refrac_e: b2.Quantity
+    refrac_i: b2.Quantity
+
+    @staticmethod
+    def get_default() -> "NeuronModelHyperparameters":
+        return NeuronModelHyperparameters(
+            v_rest_e=-65.0 * b2.mV,
+            v_rest_i=-60.0 * b2.mV,
+            v_reset_e=-65.0 * b2.mV,
+            v_reset_i=-45.0 * b2.mV,
+            v_thresh_e=-52.0 * b2.mV,
+            v_thresh_i=-40.0 * b2.mV,
+            refrac_e=5.0 * b2.ms,
+            refrac_i=2.0 * b2.ms,
+        )
+
+
 class Runner:
     def __init__(self):
         # ------------------------------------------------------------------------------
@@ -43,7 +69,7 @@ class Runner:
         # ------------------------------------------------------------------------------
         # set parameters and equations
         # ------------------------------------------------------------------------------
-        self.test_mode = True
+        self.test_mode = False
 
         np.random.seed(0)
         self.data_path = Path(".")
@@ -91,14 +117,7 @@ class Runner:
             self.save_connections_interval = 10000
             self.update_interval = 10000
 
-        self.v_rest_e: b2.Quantity = -65.0 * b2.mV
-        self.v_rest_i: b2.Quantity = -60.0 * b2.mV
-        self.v_reset_e: b2.Quantity = -65.0 * b2.mV
-        self.v_reset_i: b2.Quantity = -45.0 * b2.mV
-        self.v_thresh_e: b2.Quantity = -52.0 * b2.mV
-        self.v_thresh_i: b2.Quantity = -40.0 * b2.mV
-        self.refrac_e: b2.Quantity = 5.0 * b2.ms
-        self.refrac_i: b2.Quantity = 2.0 * b2.ms
+        self.neuron_model_hyperparameters = NeuronModelHyperparameters.get_default()
 
         self.weight = {}
         self.delay = {}
@@ -180,7 +199,7 @@ class Runner:
             self.n_e * len(self.population_names),
             self.neuron_eqs_e,
             threshold=self.v_thresh_e_eqs,
-            refractory=self.refrac_e,
+            refractory=self.neuron_model_hyperparameters.refrac_e,
             reset=self.scr_e,
             method="euler",
         )
@@ -188,7 +207,7 @@ class Runner:
             self.n_i * len(self.population_names),
             self.neuron_eqs_i,
             threshold=self.v_thresh_i_eqs,
-            refractory=self.refrac_i,
+            refractory=self.neuron_model_hyperparameters.refrac_i,
             reset=self.v_reset_i_eqs,
             method="euler",
         )
@@ -259,8 +278,12 @@ class Runner:
                 subgroup_n * self.n_i : (subgroup_n + 1) * self.n_e
             ]
 
-            self.neuron_groups[name + "e"].v = self.v_rest_e - 40.0 * b2.mV
-            self.neuron_groups[name + "i"].v = self.v_rest_i - 40.0 * b2.mV
+            self.neuron_groups[name + "e"].v = (
+                    self.neuron_model_hyperparameters.v_rest_e - 40.0 * b2.mV
+            )
+            self.neuron_groups[name + "i"].v = (
+                    self.neuron_model_hyperparameters.v_rest_i - 40.0 * b2.mV
+            )
 
             if self.test_mode or str(self.weight_path)[-7:] == "weights":
                 self.neuron_groups["e"].theta = (
@@ -417,23 +440,29 @@ class Runner:
             self.input_groups[name + "e"].rates = 0 * b2.Hz
 
         equation_variables = {
-            "v_rest_e": self.v_rest_e,
-            "v_rest_i": self.v_rest_i,
-            "v_thresh_e": self.v_thresh_e,
-            "v_thresh_i": self.v_thresh_i,
-            "refrac_e": self.refrac_e,
+            "v_rest_e": self.neuron_model_hyperparameters.v_rest_e,
+            "v_rest_i": self.neuron_model_hyperparameters.v_rest_i,
+            "v_thresh_e": self.neuron_model_hyperparameters.v_thresh_e,
+            "v_thresh_i": self.neuron_model_hyperparameters.v_thresh_i,
+            "refrac_e": self.neuron_model_hyperparameters.refrac_e,
             "offset": self.offset,
-            "v_reset_e": self.v_rest_e,
-            "v_reset_i": self.v_reset_i,
-            "tc_theta": self.tc_theta,
+            "v_reset_e": self.neuron_model_hyperparameters.v_rest_e,
+            "v_reset_i": self.neuron_model_hyperparameters.v_reset_i,
             "nu_ee_pre": self.nu_ee_pre,
             "tc_post_1_ee": self.tc_post_1_ee,
             "tc_post_2_ee": self.tc_post_2_ee,
             "tc_pre_ee": self.tc_pre_ee,
             "wmax_ee": self.wmax_ee,
             "nu_ee_post": self.nu_ee_post,
-            "theta_plus_e": self.theta_plus_e,
         }
+
+        if not self.test_mode:
+            equation_variables.update(
+                {
+                    "tc_theta": self.tc_theta,
+                    "theta_plus_e": self.theta_plus_e,
+                }
+            )
 
         net.run(0 * b2.second, namespace=equation_variables)
         j = 0
@@ -531,10 +560,12 @@ class Runner:
                         )
                         print(
                             "Classification performance",
-                            performance[: (j / float(self.update_interval)) + 1],
+                            performance[: (int(j / float(self.update_interval))) + 1],
                         )
+
                 for i, name in enumerate(self.input_population_names):
                     self.input_groups[name + "e"].rates = 0 * b2.Hz
+
                 net.run(self.resting_time, namespace=equation_variables)
                 self.input_intensity = self.start_input_intensity
                 j += 1
