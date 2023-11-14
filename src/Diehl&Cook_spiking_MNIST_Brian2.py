@@ -10,7 +10,6 @@ from typing import Dict
 
 import brian2 as b2
 import numpy as np
-from brian2tools import *
 
 from src.data_handler import (
     get_labeled_data,
@@ -23,6 +22,7 @@ from src.plotting import (
     plot_performance,
     update_2d_input_weights,
     update_performance_plot,
+    plot_results,
 )
 
 
@@ -69,7 +69,7 @@ class Runner:
         # ------------------------------------------------------------------------------
         # set parameters and equations
         # ------------------------------------------------------------------------------
-        self.test_mode = False
+        self.test_mode = True
 
         np.random.seed(0)
         self.data_path = Path(".")
@@ -188,12 +188,12 @@ class Runner:
         b2.ion()
         self.fig_num = 1
         self.neuron_groups = {}
-        self.input_groups = {}
+        self.input_groups: Dict[str, b2.PoissonGroup] = {}
         self.connections: Dict[str, b2.Synapses] = {}
-        self.rate_monitors = {}
-        self.spike_monitors = {}
-        self.spike_counters = {}
-        self.result_monitor = np.zeros((self.update_interval, self.n_e))
+        self.rate_monitors: Dict[str, b2.PopulationRateMonitor] = {}
+        self.spike_monitors: Dict[str, b2.SpikeMonitor] = {}
+        self.spike_counters: Dict[str, b2.SpikeMonitor] = {}
+        self.result_monitor: np.ndarray = np.zeros((self.update_interval, self.n_e))
 
         self.neuron_groups["e"] = b2.NeuronGroup(
             self.n_e * len(self.population_names),
@@ -337,7 +337,7 @@ class Runner:
                 self.neuron_groups[name + "i"]
             )
             self.spike_counters[name + "e"] = b2.SpikeMonitor(
-                self.neuron_groups[name + "e"]
+                self.neuron_groups[name + "e"], record=False
             )
 
             if self.record_spikes:
@@ -429,10 +429,11 @@ class Runner:
             self.fig_num += 1
 
         if self.do_plot_performance:
+            # TODO: make these into instance variables?
             (
                 performance_monitor,
                 performance,
-                fig_num,
+                self.fig_num,
                 fig_performance,
             ) = plot_performance(self.fig_num, self.num_examples, self.update_interval)
 
@@ -590,73 +591,16 @@ class Runner:
                 input_numbers,
             )
 
-        # ------------------------------------------------------------------------------
-        # plot results
-        # ------------------------------------------------------------------------------
-        if self.rate_monitors:
-            b2.figure(self.fig_num)
-            self.fig_num += 1
-
-            for i, name in enumerate(self.rate_monitors):
-                b2.subplot(len(self.rate_monitors), 1, 1 + i)
-                b2.plot(
-                    self.rate_monitors[name].t / b2.second,
-                    self.rate_monitors[name].rate,
-                    ".",
-                )
-                b2.title("Rates of population " + name)
-
-        if self.spike_monitors:
-            b2.figure(self.fig_num)
-            self.fig_num += 1
-
-            for i, name in enumerate(self.spike_monitors):
-                b2.subplot(len(self.spike_monitors), 1, 1 + i)
-                b2.plot(
-                    self.spike_monitors[name].t / b2.ms,
-                    self.spike_monitors[name].i,
-                    ".",
-                )
-                b2.title("Spikes of population " + name)
-
-        if self.spike_counters:
-            b2.figure(self.fig_num)
-            self.fig_num += 1
-            b2.plot(self.spike_monitors["Ae"].count[:])
-            b2.title("Spike count of population Ae")
-
-        plot_2d_input_weights(
-            self.n_input, self.n_e, self.connections, self.fig_num, self.wmax_ee
+        plot_results(
+            fig_num=self.fig_num,
+            rate_monitors=self.rate_monitors,
+            spike_monitors=self.spike_monitors,
+            spike_counters=self.spike_counters,
+            connections=self.connections,
+            n_input=self.n_input,
+            n_e=self.n_e,
+            weight_max_ee=self.wmax_ee,
         )
-
-        b2.plt.figure(5)
-
-        b2.subplot(3, 1, 1)
-
-        brian_plot(self.connections["XeAe"].w)
-        b2.subplot(3, 1, 2)
-
-        brian_plot(self.connections["AeAi"].w)
-
-        b2.subplot(3, 1, 3)
-
-        brian_plot(self.connections["AiAe"].w)
-
-        b2.plt.figure(6)
-
-        b2.subplot(3, 1, 1)
-
-        brian_plot(self.connections["XeAe"].delay)
-        b2.subplot(3, 1, 2)
-
-        brian_plot(self.connections["AeAi"].delay)
-
-        b2.subplot(3, 1, 3)
-
-        brian_plot(self.connections["AiAe"].delay)
-
-        b2.ioff()
-        b2.show()
 
 
 def main():
