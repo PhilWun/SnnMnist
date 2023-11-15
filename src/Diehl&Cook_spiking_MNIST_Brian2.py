@@ -121,7 +121,7 @@ class ExperimentHyperparameters:
             update_interval = num_examples
         else:
             weight_path = data_path / "random"
-            num_examples = 600 * 3
+            num_examples = 60000 * 3
             use_testing_set = False
             do_plot_performance = True
 
@@ -206,6 +206,72 @@ class NetworkArchitectureHyperparameters:
         )
 
 
+@dataclass
+class ModelEquations:
+    scr_e: str
+    v_thresh_e_eqs: str
+    v_thresh_i_eqs: str
+    v_reset_i_eqs: str
+    neuron_eqs_e: str
+    neuron_eqs_i: str
+    eqs_stdp_ee: str
+    eqs_stdp_pre_ee: str
+    eqs_stdp_post_ee: str
+
+    @staticmethod
+    def get_default(test_mode: bool) -> "ModelEquations":
+        if test_mode:
+            scr_e = "v = v_reset_e; timer = 0*ms"
+        else:
+            scr_e = "v = v_reset_e; theta += theta_plus_e; timer = 0*ms"
+
+        v_thresh_e_eqs = "(v>(theta - offset + v_thresh_e)) and (timer>refrac_e)"
+        v_thresh_i_eqs = "v>v_thresh_i"
+        v_reset_i_eqs = "v=v_reset_i"
+
+        neuron_eqs_e = """
+                       dv/dt = ((v_rest_e - v) + (I_synE+I_synI) / nS) / (100*ms)  : volt (unless refractory)
+                       I_synE = ge * nS *         -v                           : amp
+                       I_synI = gi * nS * (-100.*mV-v)                          : amp
+                       dge/dt = -ge/(1.0*ms)                                   : 1
+                       dgi/dt = -gi/(2.0*ms)                                  : 1
+                       """
+
+        if test_mode:
+            neuron_eqs_e += "\n  theta      :volt"
+        else:
+            neuron_eqs_e += "\n  dtheta/dt = -theta / (tc_theta)  : volt"
+        neuron_eqs_e += "\n  dtimer/dt = 0.1  : second"
+
+        neuron_eqs_i = """
+                dv/dt = ((v_rest_i - v) + (I_synE+I_synI) / nS) / (10*ms)  : volt (unless refractory)
+                I_synE = ge * nS *         -v                           : amp
+                I_synI = gi * nS * (-85.*mV-v)                          : amp
+                dge/dt = -ge/(1.0*ms)                                   : 1
+                dgi/dt = -gi/(2.0*ms)                                  : 1
+                """
+        eqs_stdp_ee = """
+                        post2before                            : 1
+                        dpre/dt   =   -pre/(tc_pre_ee)         : 1 (event-driven)
+                        dpost1/dt  = -post1/(tc_post_1_ee)     : 1 (event-driven)
+                        dpost2/dt  = -post2/(tc_post_2_ee)     : 1 (event-driven)
+                    """
+        eqs_stdp_pre_ee = "pre = 1.; w = clip(w + nu_ee_pre * post1, 0, wmax_ee)"
+        eqs_stdp_post_ee = "post2before = post2; w = clip(w + nu_ee_post * pre * post2before, 0, wmax_ee); post1 = 1.; post2 = 1."
+
+        return ModelEquations(
+            scr_e=scr_e,
+            v_thresh_e_eqs=v_thresh_e_eqs,
+            v_thresh_i_eqs=v_thresh_i_eqs,
+            v_reset_i_eqs=v_reset_i_eqs,
+            neuron_eqs_e=neuron_eqs_e,
+            neuron_eqs_i=neuron_eqs_i,
+            eqs_stdp_ee=eqs_stdp_ee,
+            eqs_stdp_pre_ee=eqs_stdp_pre_ee,
+            eqs_stdp_post_ee=eqs_stdp_post_ee,
+        )
+
+
 class Runner:
     def __init__(self):
         # ------------------------------------------------------------------------------
@@ -225,7 +291,7 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.experiment_hyperparameters = ExperimentHyperparameters.get_default(
-            test_mode=False
+            test_mode=True
         )
 
         self.neuron_model_hyperparameters = NeuronModelHyperparameters.get_default()
@@ -236,44 +302,9 @@ class Runner:
 
         self.synapse_model_hyperparameters = SynapseModelHyperparameters.get_default()
 
-        if self.experiment_hyperparameters.test_mode:
-            self.scr_e = "v = v_reset_e; timer = 0*ms"
-        else:
-            self.scr_e = "v = v_reset_e; theta += theta_plus_e; timer = 0*ms"
-
-        self.v_thresh_e_eqs = "(v>(theta - offset + v_thresh_e)) and (timer>refrac_e)"
-        self.v_thresh_i_eqs = "v>v_thresh_i"
-        self.v_reset_i_eqs = "v=v_reset_i"
-
-        self.neuron_eqs_e = """
-                       dv/dt = ((v_rest_e - v) + (I_synE+I_synI) / nS) / (100*ms)  : volt (unless refractory)
-                       I_synE = ge * nS *         -v                           : amp
-                       I_synI = gi * nS * (-100.*mV-v)                          : amp
-                       dge/dt = -ge/(1.0*ms)                                   : 1
-                       dgi/dt = -gi/(2.0*ms)                                  : 1
-                       """
-
-        if self.experiment_hyperparameters.test_mode:
-            self.neuron_eqs_e += "\n  theta      :volt"
-        else:
-            self.neuron_eqs_e += "\n  dtheta/dt = -theta / (tc_theta)  : volt"
-        self.neuron_eqs_e += "\n  dtimer/dt = 0.1  : second"
-
-        self.neuron_eqs_i = """
-                dv/dt = ((v_rest_i - v) + (I_synE+I_synI) / nS) / (10*ms)  : volt (unless refractory)
-                I_synE = ge * nS *         -v                           : amp
-                I_synI = gi * nS * (-85.*mV-v)                          : amp
-                dge/dt = -ge/(1.0*ms)                                   : 1
-                dgi/dt = -gi/(2.0*ms)                                  : 1
-                """
-        self.eqs_stdp_ee = """
-                        post2before                            : 1
-                        dpre/dt   =   -pre/(tc_pre_ee)         : 1 (event-driven)
-                        dpost1/dt  = -post1/(tc_post_1_ee)     : 1 (event-driven)
-                        dpost2/dt  = -post2/(tc_post_2_ee)     : 1 (event-driven)
-                    """
-        self.eqs_stdp_pre_ee = "pre = 1.; w = clip(w + nu_ee_pre * post1, 0, wmax_ee)"
-        self.eqs_stdp_post_ee = "post2before = post2; w = clip(w + nu_ee_post * pre * post2before, 0, wmax_ee); post1 = 1.; post2 = 1."
+        self.model_equations = ModelEquations.get_default(
+            self.experiment_hyperparameters.test_mode
+        )
 
         b2.ion()
         self.fig_num = 1
@@ -293,19 +324,19 @@ class Runner:
         self.neuron_groups["e"] = b2.NeuronGroup(
             self.experiment_hyperparameters.n_e
             * len(self.network_architecture_hyperparameters.population_names),
-            self.neuron_eqs_e,
-            threshold=self.v_thresh_e_eqs,
+            self.model_equations.neuron_eqs_e,
+            threshold=self.model_equations.v_thresh_e_eqs,
             refractory=self.neuron_model_hyperparameters.refrac_e,
-            reset=self.scr_e,
+            reset=self.model_equations.scr_e,
             method="euler",
         )
         self.neuron_groups["i"] = b2.NeuronGroup(
             self.experiment_hyperparameters.n_i
             * len(self.network_architecture_hyperparameters.population_names),
-            self.neuron_eqs_i,
-            threshold=self.v_thresh_i_eqs,
+            self.model_equations.neuron_eqs_i,
+            threshold=self.model_equations.v_thresh_i_eqs,
             refractory=self.neuron_model_hyperparameters.refrac_i,
-            reset=self.v_reset_i_eqs,
+            reset=self.model_equations.v_reset_i_eqs,
             method="euler",
         )
 
@@ -409,7 +440,7 @@ class Runner:
                 )
             else:
                 self.neuron_groups["e"].theta = (
-                    np.ones((self.experiment_hyperparameters.n_e)) * 20.0 * b2.mV
+                    np.ones((self.experiment_hyperparameters.n_e,)) * 20.0 * b2.mV
                 )
 
             print("create recurrent connections")
@@ -437,9 +468,9 @@ class Runner:
                         "ee"
                         in self.network_architecture_hyperparameters.recurrent_conn_names
                     ):
-                        model += self.eqs_stdp_ee
-                        pre += "; " + self.eqs_stdp_pre_ee
-                        post = self.eqs_stdp_post_ee
+                        model += self.model_equations.eqs_stdp_ee
+                        pre += "; " + self.model_equations.eqs_stdp_pre_ee
+                        post = self.model_equations.eqs_stdp_post_ee
 
                 self.connections[connName] = b2.Synapses(
                     self.neuron_groups[connName[0:2]],
@@ -507,9 +538,9 @@ class Runner:
 
                 if self.experiment_hyperparameters.ee_stdp_on:
                     print("create STDP for connection", name[0] + "e" + name[1] + "e")
-                    model += self.eqs_stdp_ee
-                    pre += "; " + self.eqs_stdp_pre_ee
-                    post = self.eqs_stdp_post_ee
+                    model += self.model_equations.eqs_stdp_ee
+                    pre += "; " + self.model_equations.eqs_stdp_pre_ee
+                    post = self.model_equations.eqs_stdp_post_ee
 
                 self.connections[connName] = b2.Synapses(
                     self.input_groups[connName[0:2]],
