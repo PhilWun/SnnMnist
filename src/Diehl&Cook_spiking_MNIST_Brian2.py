@@ -93,7 +93,7 @@ class ExperimentHyperparameters:
     use_testing_set: bool
     do_plot_performance: bool
     record_spikes: bool
-    ee_STDP_on: bool
+    ee_stdp_on: bool
     update_interval: int
     ending: str
     n_input: int
@@ -117,7 +117,7 @@ class ExperimentHyperparameters:
             use_testing_set = True
             do_plot_performance = False
             record_spikes = True
-            ee_STDP_on = False
+            ee_stdp_on = False
             update_interval = num_examples
         else:
             weight_path = data_path / "random"
@@ -130,7 +130,7 @@ class ExperimentHyperparameters:
             else:
                 record_spikes = True
 
-            ee_STDP_on = True
+            ee_stdp_on = True
 
         ending = ""
         n_input = 784
@@ -160,7 +160,7 @@ class ExperimentHyperparameters:
             use_testing_set=use_testing_set,
             do_plot_performance=do_plot_performance,
             record_spikes=record_spikes,
-            ee_STDP_on=ee_STDP_on,
+            ee_stdp_on=ee_stdp_on,
             update_interval=update_interval,
             ending=ending,
             n_input=n_input,
@@ -401,7 +401,7 @@ class Runner:
                 pre = "g%s_post += w" % conn_type[0]
                 post = ""
 
-                if self.experiment_hyperparameters.ee_STDP_on:
+                if self.experiment_hyperparameters.ee_stdp_on:
                     if "ee" in self.recurrent_conn_names:
                         model += self.eqs_stdp_ee
                         pre += "; " + self.eqs_stdp_pre_ee
@@ -469,7 +469,7 @@ class Runner:
                 pre = "g%s_post += w" % connType[0]
                 post = ""
 
-                if self.experiment_hyperparameters.ee_STDP_on:
+                if self.experiment_hyperparameters.ee_stdp_on:
                     print("create STDP for connection", name[0] + "e" + name[1] + "e")
                     model += self.eqs_stdp_ee
                     pre += "; " + self.eqs_stdp_pre_ee
