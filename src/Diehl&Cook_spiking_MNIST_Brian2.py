@@ -62,6 +62,9 @@ class SynapseModelHyperparameters:
     exp_ee_pre: float
     exp_ee_post: float
     STDP_offset: float
+    tc_theta: b2.Quantity
+    theta_plus_e: b2.Quantity
+    offset: b2.Quantity
 
     @staticmethod
     def get_default() -> "SynapseModelHyperparameters":
@@ -75,6 +78,9 @@ class SynapseModelHyperparameters:
             exp_ee_pre=0.2,
             exp_ee_post=0.2,
             STDP_offset=0.4,
+            tc_theta=1e7 * b2.ms,
+            theta_plus_e=0.05 * b2.mV,
+            offset=20.0 * b2.mV,
         )
 
 
@@ -96,7 +102,7 @@ class Runner:
         # ------------------------------------------------------------------------------
         # set parameters and equations
         # ------------------------------------------------------------------------------
-        self.test_mode = True
+        self.test_mode = False
 
         np.random.seed(0)
         self.data_path = Path(".")
@@ -165,11 +171,8 @@ class Runner:
         if self.test_mode:
             self.scr_e = "v = v_reset_e; timer = 0*ms"
         else:
-            self.tc_theta = 1e7 * b2.ms
-            self.theta_plus_e = 0.05 * b2.mV
             self.scr_e = "v = v_reset_e; theta += theta_plus_e; timer = 0*ms"
 
-        self.offset = 20.0 * b2.mV
         self.v_thresh_e_eqs = "(v>(theta - offset + v_thresh_e)) and (timer>refrac_e)"
         self.v_thresh_i_eqs = "v>v_thresh_i"
         self.v_reset_i_eqs = "v=v_reset_i"
@@ -469,7 +472,6 @@ class Runner:
             "v_thresh_e": self.neuron_model_hyperparameters.v_thresh_e,
             "v_thresh_i": self.neuron_model_hyperparameters.v_thresh_i,
             "refrac_e": self.neuron_model_hyperparameters.refrac_e,
-            "offset": self.offset,
             "v_reset_e": self.neuron_model_hyperparameters.v_rest_e,
             "v_reset_i": self.neuron_model_hyperparameters.v_reset_i,
             "nu_ee_pre": self.synapse_model_hyperparameters.nu_ee_pre,
@@ -478,13 +480,14 @@ class Runner:
             "tc_pre_ee": self.synapse_model_hyperparameters.tc_pre_ee,
             "wmax_ee": self.synapse_model_hyperparameters.wmax_ee,
             "nu_ee_post": self.synapse_model_hyperparameters.nu_ee_post,
+            "offset": self.synapse_model_hyperparameters.offset,
         }
 
         if not self.test_mode:
             equation_variables.update(
                 {
-                    "tc_theta": self.tc_theta,
-                    "theta_plus_e": self.theta_plus_e,
+                    "tc_theta": self.synapse_model_hyperparameters.tc_theta,
+                    "theta_plus_e": self.synapse_model_hyperparameters.theta_plus_e,
                 }
             )
 
