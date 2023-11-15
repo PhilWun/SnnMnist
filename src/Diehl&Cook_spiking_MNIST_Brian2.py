@@ -6,7 +6,7 @@ Created on 15.12.2014
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple, List
 
 import brian2 as b2
 import numpy as np
@@ -121,7 +121,7 @@ class ExperimentHyperparameters:
             update_interval = num_examples
         else:
             weight_path = data_path / "random"
-            num_examples = 60000 * 3
+            num_examples = 600 * 3
             use_testing_set = False
             do_plot_performance = True
 
@@ -174,6 +174,38 @@ class ExperimentHyperparameters:
         )
 
 
+@dataclass
+class NetworkArchitectureHyperparameters:
+    weight: Dict[str, float]
+    delay: Dict[str, Tuple[b2.Quantity, b2.Quantity]]
+    input_population_names: List[str]
+    population_names: List[str]
+    input_connection_names: List[str]
+    save_conns: List[str]
+    input_conn_names: List[str]
+    recurrent_conn_names: List[str]
+    input_intensity: float
+    start_input_intensity: float
+
+    @staticmethod
+    def get_default() -> "NetworkArchitectureHyperparameters":
+        return NetworkArchitectureHyperparameters(
+            weight={"ee_input": 78.0},
+            delay={
+                "ee_input": (0 * b2.ms, 10 * b2.ms),
+                "ei_input": (0 * b2.ms, 5 * b2.ms),
+            },
+            input_population_names=["X"],
+            population_names=["A"],
+            input_connection_names=["XA"],
+            save_conns=["XeAe"],
+            input_conn_names=["ee_input"],
+            recurrent_conn_names=["ei", "ie"],
+            input_intensity=2.0,
+            start_input_intensity=2.0,
+        )
+
+
 class Runner:
     def __init__(self):
         # ------------------------------------------------------------------------------
@@ -193,24 +225,14 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.experiment_hyperparameters = ExperimentHyperparameters.get_default(
-            test_mode=True
+            test_mode=False
         )
 
         self.neuron_model_hyperparameters = NeuronModelHyperparameters.get_default()
 
-        self.weight = {}
-        self.delay = {}
-        self.input_population_names = ["X"]
-        self.population_names = ["A"]
-        self.input_connection_names = ["XA"]
-        self.save_conns = ["XeAe"]
-        self.input_conn_names = ["ee_input"]
-        self.recurrent_conn_names = ["ei", "ie"]
-        self.weight["ee_input"] = 78.0
-        self.delay["ee_input"] = (0 * b2.ms, 10 * b2.ms)
-        self.delay["ei_input"] = (0 * b2.ms, 5 * b2.ms)
-        self.input_intensity = 2.0
-        self.start_input_intensity = self.input_intensity
+        self.network_architecture_hyperparameters = (
+            NetworkArchitectureHyperparameters.get_default()
+        )
 
         self.synapse_model_hyperparameters = SynapseModelHyperparameters.get_default()
 
@@ -269,7 +291,8 @@ class Runner:
         )
 
         self.neuron_groups["e"] = b2.NeuronGroup(
-            self.experiment_hyperparameters.n_e * len(self.population_names),
+            self.experiment_hyperparameters.n_e
+            * len(self.network_architecture_hyperparameters.population_names),
             self.neuron_eqs_e,
             threshold=self.v_thresh_e_eqs,
             refractory=self.neuron_model_hyperparameters.refrac_e,
@@ -277,7 +300,8 @@ class Runner:
             method="euler",
         )
         self.neuron_groups["i"] = b2.NeuronGroup(
-            self.experiment_hyperparameters.n_i * len(self.population_names),
+            self.experiment_hyperparameters.n_i
+            * len(self.network_architecture_hyperparameters.population_names),
             self.neuron_eqs_i,
             threshold=self.v_thresh_i_eqs,
             refractory=self.neuron_model_hyperparameters.refrac_i,
@@ -299,7 +323,10 @@ class Runner:
                 ] = self.connections[connName].w
                 temp_conn = np.copy(connection)
                 colSums = np.sum(temp_conn, axis=0)
-                colFactors = self.weight["ee_input"] / colSums
+                colFactors = (
+                    self.network_architecture_hyperparameters.weight["ee_input"]
+                    / colSums
+                )
 
                 for j in range(self.experiment_hyperparameters.n_e):  #
                     temp_conn[:, j] *= colFactors[j]
@@ -341,7 +368,9 @@ class Runner:
         # ------------------------------------------------------------------------------
         # create network population and recurrent connections
         # ------------------------------------------------------------------------------
-        for subgroup_n, name in enumerate(self.population_names):
+        for subgroup_n, name in enumerate(
+            self.network_architecture_hyperparameters.population_names
+        ):
             print("create neuron group", name)
 
             self.neuron_groups[name + "e"] = self.neuron_groups["e"][
@@ -385,7 +414,9 @@ class Runner:
 
             print("create recurrent connections")
 
-            for conn_type in self.recurrent_conn_names:
+            for (
+                conn_type
+            ) in self.network_architecture_hyperparameters.recurrent_conn_names:
                 connName = name + conn_type[0] + name + conn_type[1]
                 weightMatrix = get_matrix_from_file(
                     self.experiment_hyperparameters.weight_path
@@ -402,7 +433,10 @@ class Runner:
                 post = ""
 
                 if self.experiment_hyperparameters.ee_stdp_on:
-                    if "ee" in self.recurrent_conn_names:
+                    if (
+                        "ee"
+                        in self.network_architecture_hyperparameters.recurrent_conn_names
+                    ):
                         model += self.eqs_stdp_ee
                         pre += "; " + self.eqs_stdp_pre_ee
                         post = self.eqs_stdp_post_ee
@@ -444,7 +478,9 @@ class Runner:
         # ------------------------------------------------------------------------------
         pop_values = [0, 0, 0]
 
-        for i, name in enumerate(self.input_population_names):
+        for i, name in enumerate(
+            self.network_architecture_hyperparameters.input_population_names
+        ):
             self.input_groups[name + "e"] = b2.PoissonGroup(
                 self.experiment_hyperparameters.n_input, 0 * b2.Hz
             )
@@ -452,10 +488,10 @@ class Runner:
                 self.input_groups[name + "e"]
             )
 
-        for name in self.input_connection_names:
+        for name in self.network_architecture_hyperparameters.input_connection_names:
             print("create connections between", name[0], "and", name[1])
 
-            for connType in self.input_conn_names:
+            for connType in self.network_architecture_hyperparameters.input_conn_names:
                 connName = name[0] + connType[0] + name[1] + connType[1]
                 weightMatrix = get_matrix_from_file(
                     self.experiment_hyperparameters.weight_path
@@ -482,8 +518,8 @@ class Runner:
                     on_pre=pre,
                     on_post=post,
                 )
-                minDelay = self.delay[connType][0]
-                maxDelay = self.delay[connType][1]
+                minDelay = self.network_architecture_hyperparameters.delay[connType][0]
+                maxDelay = self.network_architecture_hyperparameters.delay[connType][1]
                 deltaDelay = maxDelay - minDelay
 
                 self.connections[connName].connect(True)  # all-to-all connection
@@ -538,7 +574,9 @@ class Runner:
                 self.experiment_hyperparameters.update_interval,
             )
 
-        for i, name in enumerate(self.input_population_names):
+        for i, name in enumerate(
+            self.network_architecture_hyperparameters.input_population_names
+        ):
             self.input_groups[name + "e"].rates = 0 * b2.Hz
 
         equation_variables = {
@@ -577,7 +615,7 @@ class Runner:
                             (self.experiment_hyperparameters.n_input,)
                         )
                         / 8.0
-                        * self.input_intensity
+                        * self.network_architecture_hyperparameters.input_intensity
                     )
                 else:
                     spike_rates = (
@@ -585,7 +623,7 @@ class Runner:
                             (self.experiment_hyperparameters.n_input,)
                         )
                         / 8.0
-                        * self.input_intensity
+                        * self.network_architecture_hyperparameters.input_intensity
                     )
             else:
                 self.normalize_weights()
@@ -594,7 +632,7 @@ class Runner:
                         (self.experiment_hyperparameters.n_input,)
                     )
                     / 8.0
-                    * self.input_intensity
+                    * self.network_architecture_hyperparameters.input_intensity
                 )
 
             self.input_groups["Xe"].rates = spike_rates * b2.Hz
@@ -632,13 +670,13 @@ class Runner:
                 and not self.experiment_hyperparameters.test_mode
             ):
                 save_connections(
-                    self.save_conns,
+                    self.network_architecture_hyperparameters.save_conns,
                     self.connections,
                     self.experiment_hyperparameters.data_path,
                     str(j),
                 )
                 save_theta(
-                    self.population_names,
+                    self.network_architecture_hyperparameters.population_names,
                     self.experiment_hyperparameters.data_path,
                     self.neuron_groups,
                     str(j),
@@ -650,9 +688,11 @@ class Runner:
             previous_spike_count = np.copy(self.spike_counters["Ae"].count[:])
 
             if np.sum(current_spike_count) < 5:
-                self.input_intensity += 1
+                self.network_architecture_hyperparameters.input_intensity += 1
 
-                for i, name in enumerate(self.input_population_names):
+                for i, name in enumerate(
+                    self.network_architecture_hyperparameters.input_population_names
+                ):
                     self.input_groups[name + "e"].rates = 0 * b2.Hz
 
                 net.run(
@@ -713,14 +753,18 @@ class Runner:
                             ],
                         )
 
-                for i, name in enumerate(self.input_population_names):
+                for i, name in enumerate(
+                    self.network_architecture_hyperparameters.input_population_names
+                ):
                     self.input_groups[name + "e"].rates = 0 * b2.Hz
 
                 net.run(
                     self.experiment_hyperparameters.resting_time,
                     namespace=equation_variables,
                 )
-                self.input_intensity = self.start_input_intensity
+                self.network_architecture_hyperparameters.input_intensity = (
+                    self.network_architecture_hyperparameters.start_input_intensity
+                )
                 j += 1
 
         # ------------------------------------------------------------------------------
@@ -729,13 +773,13 @@ class Runner:
         print("save results")
         if not self.experiment_hyperparameters.test_mode:
             save_theta(
-                self.population_names,
+                self.network_architecture_hyperparameters.population_names,
                 self.experiment_hyperparameters.data_path,
                 self.neuron_groups,
             )
         if not self.experiment_hyperparameters.test_mode:
             save_connections(
-                self.save_conns,
+                self.network_architecture_hyperparameters.save_conns,
                 self.connections,
                 self.experiment_hyperparameters.data_path,
             )
