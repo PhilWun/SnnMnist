@@ -51,6 +51,33 @@ class NeuronModelHyperparameters:
         )
 
 
+@dataclass
+class SynapseModelHyperparameters:
+    tc_pre_ee: b2.Quantity
+    tc_post_1_ee: b2.Quantity
+    tc_post_2_ee: b2.Quantity
+    nu_ee_pre: float
+    nu_ee_post: float
+    wmax_ee: float
+    exp_ee_pre: float
+    exp_ee_post: float
+    STDP_offset: float
+
+    @staticmethod
+    def get_default() -> "SynapseModelHyperparameters":
+        return SynapseModelHyperparameters(
+            tc_pre_ee=20 * b2.ms,
+            tc_post_1_ee=20 * b2.ms,
+            tc_post_2_ee=40 * b2.ms,
+            nu_ee_pre=0.0001,  # learning rate
+            nu_ee_post=0.01,  # learning rate,
+            wmax_ee=1.0,
+            exp_ee_pre=0.2,
+            exp_ee_post=0.2,
+            STDP_offset=0.4,
+        )
+
+
 class Runner:
     def __init__(self):
         # ------------------------------------------------------------------------------
@@ -133,15 +160,7 @@ class Runner:
         self.input_intensity = 2.0
         self.start_input_intensity = self.input_intensity
 
-        self.tc_pre_ee: b2.Quantity = 20 * b2.ms
-        self.tc_post_1_ee: b2.Quantity = 20 * b2.ms
-        self.tc_post_2_ee: b2.Quantity = 40 * b2.ms
-        self.nu_ee_pre = 0.0001  # learning rate
-        self.nu_ee_post = 0.01  # learning rate
-        self.wmax_ee = 1.0
-        self.exp_ee_pre = 0.2
-        self.exp_ee_post = self.exp_ee_pre
-        self.STDP_offset = 0.4
+        self.synapse_model_hyperparameters = SynapseModelHyperparameters.get_default()
 
         if self.test_mode:
             self.scr_e = "v = v_reset_e; timer = 0*ms"
@@ -424,7 +443,11 @@ class Runner:
 
         if not self.test_mode:
             input_weight_monitor, fig_weights = plot_2d_input_weights(
-                self.n_input, self.n_e, self.connections, self.fig_num, self.wmax_ee
+                self.n_input,
+                self.n_e,
+                self.connections,
+                self.fig_num,
+                self.synapse_model_hyperparameters.wmax_ee,
             )
             self.fig_num += 1
 
@@ -449,12 +472,12 @@ class Runner:
             "offset": self.offset,
             "v_reset_e": self.neuron_model_hyperparameters.v_rest_e,
             "v_reset_i": self.neuron_model_hyperparameters.v_reset_i,
-            "nu_ee_pre": self.nu_ee_pre,
-            "tc_post_1_ee": self.tc_post_1_ee,
-            "tc_post_2_ee": self.tc_post_2_ee,
-            "tc_pre_ee": self.tc_pre_ee,
-            "wmax_ee": self.wmax_ee,
-            "nu_ee_post": self.nu_ee_post,
+            "nu_ee_pre": self.synapse_model_hyperparameters.nu_ee_pre,
+            "tc_post_1_ee": self.synapse_model_hyperparameters.tc_post_1_ee,
+            "tc_post_2_ee": self.synapse_model_hyperparameters.tc_post_2_ee,
+            "tc_pre_ee": self.synapse_model_hyperparameters.tc_pre_ee,
+            "wmax_ee": self.synapse_model_hyperparameters.wmax_ee,
+            "nu_ee_post": self.synapse_model_hyperparameters.nu_ee_post,
         }
 
         if not self.test_mode:
@@ -466,7 +489,7 @@ class Runner:
             )
 
         net.run(0 * b2.second, namespace=equation_variables)
-        j = 0
+        j: int = 0
 
         while j < (int(self.num_examples)):
             if self.test_mode:
@@ -599,7 +622,7 @@ class Runner:
             connections=self.connections,
             n_input=self.n_input,
             n_e=self.n_e,
-            weight_max_ee=self.wmax_ee,
+            weight_max_ee=self.synapse_model_hyperparameters.wmax_ee,
         )
 
 
