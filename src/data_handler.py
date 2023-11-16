@@ -3,8 +3,9 @@ import pickle
 from pathlib import Path
 
 from struct import unpack
-from typing import Dict, Any, TypedDict
+from typing import Dict, TypedDict, List
 
+import brian2 as b2
 import numpy as np
 
 # specify the location of the MNIST data
@@ -38,22 +39,24 @@ def get_labeled_data(pickle_file_name: str, b_train=True) -> LabeledData:
 
         # Get metadata for images
         images.read(4)  # skip the magic_number
-        number_of_images = unpack(">I", images.read(4))[0]
+        number_of_images: int = unpack(">I", images.read(4))[0]
         rows: int = unpack(">I", images.read(4))[0]
         cols: int = unpack(">I", images.read(4))[0]
         # Get metadata for labels
         labels.read(4)  # skip the magic_number
-        N: int = unpack(">I", labels.read(4))[0]
+        number_of_labels: int = unpack(">I", labels.read(4))[0]
 
-        if number_of_images != N:
+        if number_of_images != number_of_labels:
             raise Exception("number of labels did not match the number of images")
         # Get the data
         x: np.ndarray = np.zeros(
-            (N, rows, cols), dtype=np.uint8
+            (number_of_labels, rows, cols), dtype=np.uint8
         )  # Initialize numpy array
-        y: np.ndarray = np.zeros((N, 1), dtype=np.uint8)  # Initialize numpy array
+        y: np.ndarray = np.zeros(
+            (number_of_labels, 1), dtype=np.uint8
+        )  # Initialize numpy array
 
-        for i in range(N):
+        for i in range(number_of_labels):
             if i % 1000 == 0:
                 print("i: %i" % i)
             x[i] = [
@@ -70,7 +73,7 @@ def get_labeled_data(pickle_file_name: str, b_train=True) -> LabeledData:
 
 def get_matrix_from_file(
     file_name: Path, ending: str, n_input: int, n_e: int, n_i: int
-):
+) -> np.ndarray:
     offset = len(ending) + 4
 
     if file_name.name[-4 - offset] == "X":
@@ -96,7 +99,12 @@ def get_matrix_from_file(
     return value_arr
 
 
-def save_connections(save_conns, connections, data_path: Path, ending=""):
+def save_connections(
+    save_conns: List[str],
+    connections: Dict[str, b2.Synapses],
+    data_path: Path,
+    ending="",
+) -> None:
     print("save connections")
 
     for connName in save_conns:
@@ -105,7 +113,12 @@ def save_connections(save_conns, connections, data_path: Path, ending=""):
         np.save(data_path / "weights" / (connName + ending), conn_list_sparse)
 
 
-def save_theta(population_names, data_path: Path, neuron_groups, ending=""):
+def save_theta(
+    population_names: List[str],
+    data_path: Path,
+    neuron_groups: Dict[str, b2.NeuronGroup],
+    ending="",
+) -> None:
     print("save theta")
 
     for pop_name in population_names:

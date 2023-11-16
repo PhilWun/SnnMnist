@@ -1,12 +1,16 @@
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Tuple
 
 import brian2 as b2
 import matplotlib
 import numpy as np
 from brian2tools import brian_plot
+from matplotlib.image import AxesImage
+from matplotlib.lines import Line2D
 
 
-def get_2d_input_weights(n_input: int, n_e: int, connections: Dict[str, b2.Synapses]):
+def get_2d_input_weights(
+    n_input: int, n_e: int, connections: Dict[str, b2.Synapses]
+) -> np.ndarray:
     name = "XeAe"
     n_e_sqrt = int(np.sqrt(n_e))
     n_in_sqrt = int(np.sqrt(n_input))
@@ -32,7 +36,7 @@ def plot_2d_input_weights(
     connections: Dict[str, b2.Synapses],
     fig_num: int,
     weight_max_ee: float,
-):
+) -> Tuple[AxesImage, b2.Figure]:
     name = "XeAe"
     weights = get_2d_input_weights(n_input, n_e, connections)
     fig = b2.figure(fig_num, figsize=(18, 18))
@@ -51,8 +55,12 @@ def plot_2d_input_weights(
 
 
 def update_2d_input_weights(
-    im, fig, n_input: int, n_e: int, connections: Dict[str, b2.Synapses]
-):
+    im: AxesImage,
+    fig: b2.Figure,
+    n_input: int,
+    n_e: int,
+    connections: Dict[str, b2.Synapses],
+) -> AxesImage:
     weights = get_2d_input_weights(n_input, n_e, connections)
     im.set_array(weights)
     fig.canvas.draw()
@@ -61,12 +69,12 @@ def update_2d_input_weights(
 
 
 def get_current_performance(
-    performance,
-    current_example_num,
+    performance: np.ndarray,
+    current_example_num: int,
     update_interval: int,
     output_numbers: np.ndarray,
     input_numbers: List[int],
-):
+) -> np.ndarray:
     current_evaluation = int(current_example_num / update_interval)
     start_num = current_example_num - update_interval
     end_num = current_example_num
@@ -79,14 +87,14 @@ def get_current_performance(
 
 def plot_performance(
     fig_num: int, num_examples: int, update_interval: int
-) -> Tuple[Any, np.ndarray, int, b2.Figure]:
+) -> Tuple[Line2D, np.ndarray, int, b2.Figure]:
     num_evaluations = int(num_examples / update_interval)
     time_steps = range(0, num_evaluations)
-    performance = np.zeros(num_evaluations)
-    fig = b2.figure(fig_num, figsize=(5, 5))
+    performance: np.ndarray = np.zeros(num_evaluations)
+    fig: b2.Figure = b2.figure(fig_num, figsize=(5, 5))
     fig_num += 1
     ax = fig.add_subplot(111)
-    (im2,) = ax.plot(time_steps, performance)  # my_cmap
+    im2: Line2D = ax.plot(time_steps, performance)[0]  # my_cmap
     b2.ylim(ymax=100)
     b2.title("Classification performance")
     fig.canvas.draw()
@@ -95,14 +103,14 @@ def plot_performance(
 
 
 def update_performance_plot(
-    im,
-    performance,
-    current_example_num,
-    fig,
+    im: Line2D,
+    performance: np.ndarray,
+    current_example_num: int,
+    fig: b2.Figure,
     update_interval: int,
     output_numbers: np.ndarray,
     input_numbers: List[int],
-):
+) -> Tuple[Line2D, np.ndarray]:
     performance = get_current_performance(
         performance, current_example_num, update_interval, output_numbers, input_numbers
     )

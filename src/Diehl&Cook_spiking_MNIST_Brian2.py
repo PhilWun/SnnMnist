@@ -10,6 +10,9 @@ from typing import Dict, Tuple, List
 
 import brian2 as b2
 import numpy as np
+from matplotlib.figure import Figure
+from matplotlib.image import AxesImage
+from matplotlib.lines import Line2D
 
 from src.data_handler import (
     get_labeled_data,
@@ -118,10 +121,9 @@ class ExperimentHyperparameters:
             do_plot_performance = False
             record_spikes = True
             ee_stdp_on = False
-            update_interval = num_examples
         else:
             weight_path = data_path / "random"
-            num_examples = 60000 * 3
+            num_examples = 600 * 3
             use_testing_set = False
             do_plot_performance = True
 
@@ -291,7 +293,7 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.experiment_hyperparameters = ExperimentHyperparameters.get_default(
-            test_mode=True
+            test_mode=False
         )
 
         self.neuron_model_hyperparameters = NeuronModelHyperparameters.get_default()
@@ -353,40 +355,45 @@ class Runner:
                     self.connections[connName].i, self.connections[connName].j
                 ] = self.connections[connName].w
                 temp_conn = np.copy(connection)
-                colSums = np.sum(temp_conn, axis=0)
-                colFactors = (
+                col_sums = np.sum(temp_conn, axis=0)
+                col_factors = (
                     self.network_architecture_hyperparameters.weight["ee_input"]
-                    / colSums
+                    / col_sums
                 )
 
                 for j in range(self.experiment_hyperparameters.n_e):  #
-                    temp_conn[:, j] *= colFactors[j]
+                    temp_conn[:, j] *= col_factors[j]
 
                 self.connections[connName].w = temp_conn[
                     self.connections[connName].i, self.connections[connName].j
                 ]
 
-    def get_recognized_number_ranking(self, assignments, spike_rates):
+    @staticmethod
+    def get_recognized_number_ranking(
+        assignments: np.ndarray, spike_rates: np.ndarray
+    ) -> np.ndarray:
         summed_rates = [0] * 10
         num_assignments = [0] * 10
+
         for i in range(10):
             num_assignments[i] = len(np.where(assignments == i)[0])
             if num_assignments[i] > 0:
                 summed_rates[i] = (
                     np.sum(spike_rates[assignments == i]) / num_assignments[i]
                 )
+
         return np.argsort(summed_rates)[::-1]
 
-    def get_new_assignments(self, result_monitor, input_numbers):
-        assignments = np.zeros(self.experiment_hyperparameters.n_e)
-        input_nums = np.asarray(input_numbers)
-        maximum_rate = [0] * self.experiment_hyperparameters.n_e
+    def get_new_assignments(self, result_monitor: np.ndarray, input_numbers: List[int]):
+        assignments: np.ndarray = np.zeros(self.experiment_hyperparameters.n_e)
+        input_nums: np.ndarray = np.asarray(input_numbers)
+        maximum_rate: List[float] = [0] * self.experiment_hyperparameters.n_e
 
         for j in range(10):
             num_assignments = len(np.where(input_nums == j)[0])
+            assert num_assignments > 0
 
-            if num_assignments > 0:
-                rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
+            rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
 
             for i in range(self.experiment_hyperparameters.n_e):
                 if rate[i] > maximum_rate[i]:
@@ -399,6 +406,9 @@ class Runner:
         # ------------------------------------------------------------------------------
         # create network population and recurrent connections
         # ------------------------------------------------------------------------------
+        name: str
+        subgroup_n: int
+
         for subgroup_n, name in enumerate(
             self.network_architecture_hyperparameters.population_names
         ):
@@ -445,22 +455,24 @@ class Runner:
 
             print("create recurrent connections")
 
+            conn_type: str
+
             for (
                 conn_type
             ) in self.network_architecture_hyperparameters.recurrent_conn_names:
-                connName = name + conn_type[0] + name + conn_type[1]
-                weightMatrix = get_matrix_from_file(
+                conn_name = name + conn_type[0] + name + conn_type[1]
+                weight_matrix = get_matrix_from_file(
                     self.experiment_hyperparameters.weight_path
                     / ".."
                     / "random"
-                    / (connName + self.experiment_hyperparameters.ending + ".npy"),
+                    / (conn_name + self.experiment_hyperparameters.ending + ".npy"),
                     self.experiment_hyperparameters.ending,
                     self.experiment_hyperparameters.n_input,
                     self.experiment_hyperparameters.n_e,
                     self.experiment_hyperparameters.n_i,
                 )
                 model = "w : 1"
-                pre = "g%s_post += w" % conn_type[0]
+                pre = f"g{conn_type[0]}_post += w"
                 post = ""
 
                 if self.experiment_hyperparameters.ee_stdp_on:
@@ -472,16 +484,16 @@ class Runner:
                         pre += "; " + self.model_equations.eqs_stdp_pre_ee
                         post = self.model_equations.eqs_stdp_post_ee
 
-                self.connections[connName] = b2.Synapses(
-                    self.neuron_groups[connName[0:2]],
-                    self.neuron_groups[connName[2:4]],
+                self.connections[conn_name] = b2.Synapses(
+                    self.neuron_groups[conn_name[0:2]],
+                    self.neuron_groups[conn_name[2:4]],
                     model=model,
                     on_pre=pre,
                     on_post=post,
                 )
-                self.connections[connName].connect(True)  # all-to-all connection
-                self.connections[connName].w = weightMatrix[
-                    self.connections[connName].i, self.connections[connName].j
+                self.connections[conn_name].connect(True)  # all-to-all connection
+                self.connections[conn_name].w = weight_matrix[
+                    self.connections[conn_name].i, self.connections[conn_name].j
                 ]
 
             print("create monitors for", name)
@@ -507,7 +519,8 @@ class Runner:
         # ------------------------------------------------------------------------------
         # create input population and connections from input populations
         # ------------------------------------------------------------------------------
-        pop_values = [0, 0, 0]
+        i: int
+        name: str
 
         for i, name in enumerate(
             self.network_architecture_hyperparameters.input_population_names
@@ -522,18 +535,18 @@ class Runner:
         for name in self.network_architecture_hyperparameters.input_connection_names:
             print("create connections between", name[0], "and", name[1])
 
-            for connType in self.network_architecture_hyperparameters.input_conn_names:
-                connName = name[0] + connType[0] + name[1] + connType[1]
-                weightMatrix = get_matrix_from_file(
+            for conn_type in self.network_architecture_hyperparameters.input_conn_names:
+                conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
+                weight_matrix = get_matrix_from_file(
                     self.experiment_hyperparameters.weight_path
-                    / (connName + self.experiment_hyperparameters.ending + ".npy"),
+                    / (conn_name + self.experiment_hyperparameters.ending + ".npy"),
                     self.experiment_hyperparameters.ending,
                     self.experiment_hyperparameters.n_input,
                     self.experiment_hyperparameters.n_e,
                     self.experiment_hyperparameters.n_i,
                 )
                 model = "w : 1"
-                pre = "g%s_post += w" % connType[0]
+                pre = f"g{conn_type[0]}_post += w"
                 post = ""
 
                 if self.experiment_hyperparameters.ee_stdp_on:
@@ -542,21 +555,25 @@ class Runner:
                     pre += "; " + self.model_equations.eqs_stdp_pre_ee
                     post = self.model_equations.eqs_stdp_post_ee
 
-                self.connections[connName] = b2.Synapses(
-                    self.input_groups[connName[0:2]],
-                    self.neuron_groups[connName[2:4]],
+                self.connections[conn_name] = b2.Synapses(
+                    self.input_groups[conn_name[0:2]],
+                    self.neuron_groups[conn_name[2:4]],
                     model=model,
                     on_pre=pre,
                     on_post=post,
                 )
-                minDelay = self.network_architecture_hyperparameters.delay[connType][0]
-                maxDelay = self.network_architecture_hyperparameters.delay[connType][1]
-                deltaDelay = maxDelay - minDelay
+                min_delay = self.network_architecture_hyperparameters.delay[conn_type][
+                    0
+                ]
+                max_delay = self.network_architecture_hyperparameters.delay[conn_type][
+                    1
+                ]
+                delta_delay = max_delay - min_delay
 
-                self.connections[connName].connect(True)  # all-to-all connection
-                self.connections[connName].delay = "minDelay + rand() * deltaDelay"
-                self.connections[connName].w = weightMatrix[
-                    self.connections[connName].i, self.connections[connName].j
+                self.connections[conn_name].connect(True)  # all-to-all connection
+                self.connections[conn_name].delay = "min_delay + rand() * delta_delay"
+                self.connections[conn_name].w = weight_matrix[
+                    self.connections[conn_name].i, self.connections[conn_name].j
                 ]
 
     def run(self):
@@ -577,10 +594,15 @@ class Runner:
             for key in obj_list:
                 net.add(obj_list[key])
 
-        previous_spike_count = np.zeros(self.experiment_hyperparameters.n_e)
-        assignments = np.zeros(self.experiment_hyperparameters.n_e)
-        input_numbers = [0] * self.experiment_hyperparameters.num_examples
-        outputNumbers = np.zeros((self.experiment_hyperparameters.num_examples, 10))
+        previous_spike_count: np.ndarray = np.zeros(self.experiment_hyperparameters.n_e)
+        assignments: np.ndarray = np.zeros(self.experiment_hyperparameters.n_e)
+        input_numbers: List[int] = [0] * self.experiment_hyperparameters.num_examples
+        output_numbers: np.ndarray = np.zeros(
+            (self.experiment_hyperparameters.num_examples, 10)
+        )
+
+        input_weight_monitor: AxesImage | None = None
+        fig_weights: Figure | None = None
 
         if not self.experiment_hyperparameters.test_mode:
             input_weight_monitor, fig_weights = plot_2d_input_weights(
@@ -592,8 +614,12 @@ class Runner:
             )
             self.fig_num += 1
 
+        # TODO: extract
+        performance_monitor: Line2D | None = None
+        performance: np.ndarray | None = None
+        fig_performance: b2.Figure | None = None
+
         if self.experiment_hyperparameters.do_plot_performance:
-            # TODO: make these into instance variables?
             (
                 performance_monitor,
                 performance,
@@ -636,13 +662,13 @@ class Runner:
             )
 
         net.run(0 * b2.second, namespace=equation_variables)
-        j: int = 0
+        iteration: int = 0
 
-        while j < (int(self.experiment_hyperparameters.num_examples)):
+        while iteration < (int(self.experiment_hyperparameters.num_examples)):
             if self.experiment_hyperparameters.test_mode:
                 if self.experiment_hyperparameters.use_testing_set:
                     spike_rates = (
-                        self.testing_data["x"][j % 10000, :, :].reshape(
+                        self.testing_data["x"][iteration % 10000, :, :].reshape(
                             (self.experiment_hyperparameters.n_input,)
                         )
                         / 8.0
@@ -650,7 +676,7 @@ class Runner:
                     )
                 else:
                     spike_rates = (
-                        self.training_data["x"][j % 60000, :, :].reshape(
+                        self.training_data["x"][iteration % 60000, :, :].reshape(
                             (self.experiment_hyperparameters.n_input,)
                         )
                         / 8.0
@@ -659,7 +685,7 @@ class Runner:
             else:
                 self.normalize_weights()
                 spike_rates = (
-                    self.training_data["x"][j % 60000, :, :].reshape(
+                    self.training_data["x"][iteration % 60000, :, :].reshape(
                         (self.experiment_hyperparameters.n_input,)
                     )
                     / 8.0
@@ -674,16 +700,21 @@ class Runner:
                 namespace=equation_variables,
             )
 
-            if j % self.experiment_hyperparameters.update_interval == 0 and j > 0:
+            if (
+                iteration % self.experiment_hyperparameters.update_interval == 0
+                and iteration > 0
+            ):
                 assignments = self.get_new_assignments(
                     self.result_monitor[:],
                     input_numbers[
-                        j - self.experiment_hyperparameters.update_interval : j
+                        iteration
+                        - self.experiment_hyperparameters.update_interval : iteration
                     ],
                 )
 
+            # TODO: extract
             if (
-                j % self.experiment_hyperparameters.weight_update_interval == 0
+                iteration % self.experiment_hyperparameters.weight_update_interval == 0
                 and not self.experiment_hyperparameters.test_mode
             ):
                 update_2d_input_weights(
@@ -696,27 +727,30 @@ class Runner:
                 b2.pause(0.1)  # triggers update of the plots
 
             if (
-                j % self.experiment_hyperparameters.save_connections_interval == 0
-                and j > 0
+                iteration % self.experiment_hyperparameters.save_connections_interval
+                == 0
+                and iteration > 0
                 and not self.experiment_hyperparameters.test_mode
             ):
                 save_connections(
                     self.network_architecture_hyperparameters.save_conns,
                     self.connections,
                     self.experiment_hyperparameters.data_path,
-                    str(j),
+                    str(iteration),
                 )
                 save_theta(
                     self.network_architecture_hyperparameters.population_names,
                     self.experiment_hyperparameters.data_path,
                     self.neuron_groups,
-                    str(j),
+                    str(iteration),
                 )
 
-            current_spike_count = (
+            current_spike_count: np.ndarray = (
                 np.asarray(self.spike_counters["Ae"].count[:]) - previous_spike_count
             )
-            previous_spike_count = np.copy(self.spike_counters["Ae"].count[:])
+            previous_spike_count: np.ndarray = np.copy(
+                self.spike_counters["Ae"].count[:]
+            )
 
             if np.sum(current_spike_count) < 5:
                 self.network_architecture_hyperparameters.input_intensity += 1
@@ -732,41 +766,49 @@ class Runner:
                 )
             else:
                 self.result_monitor[
-                    j % self.experiment_hyperparameters.update_interval, :
+                    iteration % self.experiment_hyperparameters.update_interval, :
                 ] = current_spike_count
 
                 if (
                     self.experiment_hyperparameters.test_mode
                     and self.experiment_hyperparameters.use_testing_set
                 ):
-                    input_numbers[j] = self.testing_data["y"][j % 10000][0]
+                    input_numbers[iteration] = self.testing_data["y"][
+                        iteration % 10000
+                    ][0].item()
                 else:
-                    input_numbers[j] = self.training_data["y"][j % 60000][0]
+                    input_numbers[iteration] = self.training_data["y"][
+                        iteration % 60000
+                    ][0].item()
 
-                outputNumbers[j, :] = self.get_recognized_number_ranking(
+                output_numbers[iteration, :] = self.get_recognized_number_ranking(
                     assignments,
                     self.result_monitor[
-                        j % self.experiment_hyperparameters.update_interval, :
+                        iteration % self.experiment_hyperparameters.update_interval, :
                     ],
                 )
 
-                if j % 100 == 0 and j > 0:
+                if iteration % 100 == 0 and iteration > 0:
                     print(
                         "runs done:",
-                        j,
+                        iteration,
                         "of",
                         int(self.experiment_hyperparameters.num_examples),
                     )
 
-                if j % self.experiment_hyperparameters.update_interval == 0 and j > 0:
+                # TODO: extract
+                if (
+                    iteration % self.experiment_hyperparameters.update_interval == 0
+                    and iteration > 0
+                ):
                     if self.experiment_hyperparameters.do_plot_performance:
                         unused, performance = update_performance_plot(
                             performance_monitor,
                             performance,
-                            j,
+                            iteration,
                             fig_performance,
                             self.experiment_hyperparameters.update_interval,
-                            outputNumbers,
+                            output_numbers,
                             input_numbers,
                         )
                         print(
@@ -774,7 +816,7 @@ class Runner:
                             performance[
                                 : (
                                     int(
-                                        j
+                                        iteration
                                         / float(
                                             self.experiment_hyperparameters.update_interval
                                         )
@@ -796,7 +838,7 @@ class Runner:
                 self.network_architecture_hyperparameters.input_intensity = (
                     self.network_architecture_hyperparameters.start_input_intensity
                 )
-                j += 1
+                iteration += 1
 
         # ------------------------------------------------------------------------------
         # save results
