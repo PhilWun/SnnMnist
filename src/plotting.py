@@ -69,29 +69,26 @@ def update_2d_input_weights(
     return im
 
 
-def get_current_performance(
-    performance: np.ndarray,
+def add_current_performance(
+    performance: List[float],
     current_example_num: int,
     update_interval: int,
     output_numbers: np.ndarray,
     input_numbers: List[int],
-) -> np.ndarray:
+) -> None:
     current_evaluation = int(current_example_num / update_interval)
     start_num = current_example_num - update_interval
     end_num = current_example_num
     difference = output_numbers[start_num:end_num, 0] - input_numbers[start_num:end_num]
     correct = len(np.where(difference == 0)[0])
-    performance[current_evaluation] = correct / float(update_interval) * 100
-
-    return performance
+    performance.append(correct / float(update_interval) * 100)
 
 
 def plot_performance(
     fig_num: int, num_examples: int, update_interval: int
-) -> Tuple[Line2D, np.ndarray, int, b2.Figure]:
-    num_evaluations = int(num_examples / update_interval)
-    time_steps = range(0, num_evaluations)
-    performance: np.ndarray = np.zeros(num_evaluations)
+) -> Tuple[Line2D, List[float], int, b2.Figure]:
+    time_steps = range(0, 1)
+    performance = [0.0]
     fig: b2.Figure = b2.figure(fig_num, figsize=(5, 5))
     fig_num += 1
     ax = fig.add_subplot(111)
@@ -105,20 +102,23 @@ def plot_performance(
 
 def update_performance_plot(
     im: Line2D,
-    performance: np.ndarray,
+    performance: List[float],
     current_example_num: int,
     fig: b2.Figure,
     update_interval: int,
     output_numbers: np.ndarray,
     input_numbers: List[int],
-) -> Tuple[Line2D, np.ndarray]:
-    performance = get_current_performance(
+) -> Line2D:
+    add_current_performance(
         performance, current_example_num, update_interval, output_numbers, input_numbers
     )
     im.set_ydata(performance)
+    im.set_xdata(range(0, len(performance)))
+    fig.axes[0].relim()
+    fig.axes[0].autoscale_view(True, True, True)
     fig.canvas.draw()
 
-    return im, performance
+    return im
 
 
 class PlottingHandler:
@@ -128,7 +128,7 @@ class PlottingHandler:
         self.input_weight_monitor: AxesImage | None = None
         self.fig_weights: Figure | None = None
         self.performance_monitor: Line2D | None = None
-        self.performance: np.ndarray | None = None
+        self.performance: List[float] = []
         self.fig_performance: b2.Figure | None = None
 
     def plot_input_weights(
@@ -208,7 +208,7 @@ class PlottingHandler:
         if not do_plot_performance:
             return
 
-        _, self.performance = update_performance_plot(
+        update_performance_plot(
             self.performance_monitor,
             self.performance,
             iteration,
