@@ -4,6 +4,7 @@ import brian2 as b2
 import matplotlib
 import numpy as np
 from brian2tools import brian_plot
+from matplotlib.figure import Figure
 from matplotlib.image import AxesImage
 from matplotlib.lines import Line2D
 
@@ -120,78 +121,182 @@ def update_performance_plot(
     return im, performance
 
 
-def plot_results(
-    fig_num: int,
-    rate_monitors: Dict[str, b2.PopulationRateMonitor],
-    spike_monitors: Dict[str, b2.SpikeMonitor],
-    spike_counters: Dict[str, b2.SpikeMonitor],
-    connections: Dict[str, b2.Synapses],
-    n_input: int,
-    n_e: int,
-    weight_max_ee: float,
-):
-    # ------------------------------------------------------------------------------
-    # plot results
-    # ------------------------------------------------------------------------------
-    if rate_monitors:
-        b2.figure(fig_num)
-        fig_num += 1
+class PlottingHandler:
+    def __init__(self):
+        b2.ion()
+        self.fig_num = 1
+        self.input_weight_monitor: AxesImage | None = None
+        self.fig_weights: Figure | None = None
+        self.performance_monitor: Line2D | None = None
+        self.performance: np.ndarray | None = None
+        self.fig_performance: b2.Figure | None = None
 
-        for i, name in enumerate(rate_monitors):
-            b2.subplot(len(rate_monitors), 1, 1 + i)
-            b2.plot(
-                rate_monitors[name].t / b2.second,
-                rate_monitors[name].rate,
-                ".",
-            )
-            b2.title("Rates of population " + name)
+    def plot_input_weights(
+        self,
+        test_mode: bool,
+        n_input: int,
+        n_e: int,
+        connections: Dict[str, b2.Synapses],
+        wmax_ee: float,
+    ):
+        if test_mode:
+            return
 
-    if spike_monitors:
-        b2.figure(fig_num)
-        fig_num += 1
+        self.input_weight_monitor, self.fig_weights = plot_2d_input_weights(
+            n_input,
+            n_e,
+            connections,
+            self.fig_num,
+            wmax_ee,
+        )
+        self.fig_num += 1
 
-        for i, name in enumerate(spike_monitors):
-            b2.subplot(len(spike_monitors), 1, 1 + i)
-            b2.plot(
-                spike_monitors[name].t / b2.ms,
-                spike_monitors[name].i,
-                ".",
-            )
-            b2.title("Spikes of population " + name)
+    def update_input_weights_plot(
+        self,
+        iteration: int,
+        weight_update_interval: int,
+        test_mode: bool,
+        n_input: int,
+        n_e: int,
+        connections: Dict[str, b2.Synapses],
+    ):
+        if test_mode:
+            return
 
-    if spike_counters:
-        b2.figure(fig_num)
-        fig_num += 1
-        b2.plot(spike_monitors["Ae"].count[:])
-        b2.title("Spike count of population Ae")
+        if iteration % weight_update_interval != 0:
+            return
 
-    plot_2d_input_weights(n_input, n_e, connections, fig_num, weight_max_ee)
+        update_2d_input_weights(
+            self.input_weight_monitor,
+            self.fig_weights,
+            n_input,
+            n_e,
+            connections,
+        )
+        b2.pause(0.1)  # triggers update of the plots
 
-    b2.plt.figure(5)
+    def plot_performance(
+        self, do_plot_performance: bool, num_examples: int, update_interval: int
+    ):
+        if not do_plot_performance:
+            return
 
-    b2.subplot(3, 1, 1)
+        (
+            self.performance_monitor,
+            self.performance,
+            self.fig_num,
+            self.fig_performance,
+        ) = plot_performance(
+            self.fig_num,
+            num_examples,
+            update_interval,
+        )
 
-    brian_plot(connections["XeAe"].w)
-    b2.subplot(3, 1, 2)
+    def update_performance_plot(
+        self,
+        iteration: int,
+        update_interval: int,
+        do_plot_performance: bool,
+        input_numbers: List[int],
+        output_numbers: np.ndarray,
+    ):
+        should_update = iteration % update_interval == 0 and iteration > 0
 
-    brian_plot(connections["AeAi"].w)
+        if not should_update:
+            return
 
-    b2.subplot(3, 1, 3)
+        if not do_plot_performance:
+            return
 
-    brian_plot(connections["AiAe"].w)
+        _, self.performance = update_performance_plot(
+            self.performance_monitor,
+            self.performance,
+            iteration,
+            self.fig_performance,
+            update_interval,
+            output_numbers,
+            input_numbers,
+        )
 
-    b2.plt.figure(6)
+        index = int(iteration / float(update_interval))
 
-    b2.subplot(3, 1, 1)
+        print(
+            "Classification performance",
+            self.performance[: index + 1],
+        )
 
-    brian_plot(connections["XeAe"].delay)
-    b2.subplot(3, 1, 2)
+    def plot_results(
+        self,
+        rate_monitors: Dict[str, b2.PopulationRateMonitor],
+        spike_monitors: Dict[str, b2.SpikeMonitor],
+        spike_counters: Dict[str, b2.SpikeMonitor],
+        connections: Dict[str, b2.Synapses],
+        n_input: int,
+        n_e: int,
+        weight_max_ee: float,
+    ):
+        # ------------------------------------------------------------------------------
+        # plot results
+        # ------------------------------------------------------------------------------
+        if rate_monitors:
+            b2.figure(self.fig_num)
+            self.fig_num += 1
 
-    brian_plot(connections["AeAi"].delay)
+            for i, name in enumerate(rate_monitors):
+                b2.subplot(len(rate_monitors), 1, 1 + i)
+                b2.plot(
+                    rate_monitors[name].t / b2.second,
+                    rate_monitors[name].rate,
+                    ".",
+                )
+                b2.title("Rates of population " + name)
 
-    b2.subplot(3, 1, 3)
+        if spike_monitors:
+            b2.figure(self.fig_num)
+            self.fig_num += 1
 
-    brian_plot(connections["AiAe"].delay)
+            for i, name in enumerate(spike_monitors):
+                b2.subplot(len(spike_monitors), 1, 1 + i)
+                b2.plot(
+                    spike_monitors[name].t / b2.ms,
+                    spike_monitors[name].i,
+                    ".",
+                )
+                b2.title("Spikes of population " + name)
 
-    b2.ioff()
-    b2.show()
+        if spike_counters:
+            b2.figure(self.fig_num)
+            self.fig_num += 1
+            b2.plot(spike_monitors["Ae"].count[:])
+            b2.title("Spike count of population Ae")
+
+        plot_2d_input_weights(n_input, n_e, connections, self.fig_num, weight_max_ee)
+
+        b2.plt.figure(5)
+
+        b2.subplot(3, 1, 1)
+
+        brian_plot(connections["XeAe"].w)
+        b2.subplot(3, 1, 2)
+
+        brian_plot(connections["AeAi"].w)
+
+        b2.subplot(3, 1, 3)
+
+        brian_plot(connections["AiAe"].w)
+
+        b2.plt.figure(6)
+
+        b2.subplot(3, 1, 1)
+
+        brian_plot(connections["XeAe"].delay)
+        b2.subplot(3, 1, 2)
+
+        brian_plot(connections["AeAi"].delay)
+
+        b2.subplot(3, 1, 3)
+
+        brian_plot(connections["AiAe"].delay)
+
+        b2.ioff()
+        b2.show()

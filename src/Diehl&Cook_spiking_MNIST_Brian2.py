@@ -8,9 +8,6 @@ from typing import Dict, List
 
 import brian2 as b2
 import numpy as np
-from matplotlib.figure import Figure
-from matplotlib.image import AxesImage
-from matplotlib.lines import Line2D
 
 from src.data_handler import (
     get_labeled_data,
@@ -25,13 +22,7 @@ from src.hyperparameters import (
     SynapseModelHyperparameters,
     ModelEquations,
 )
-from src.plotting import (
-    plot_2d_input_weights,
-    plot_performance,
-    update_2d_input_weights,
-    update_performance_plot,
-    plot_results,
-)
+from src.plotting import PlottingHandler
 
 
 class Runner:
@@ -68,8 +59,6 @@ class Runner:
             self.experiment_hyperparameters.test_mode
         )
 
-        b2.ion()
-        self.fig_num = 1
         self.neuron_groups = {}
         self.input_groups: Dict[str, b2.PoissonGroup] = {}
         self.connections: Dict[str, b2.Synapses] = {}
@@ -104,6 +93,8 @@ class Runner:
 
         self.create_network_and_recurrent_connections()
         self.create_input_population_and_connection()
+
+        self.plotting_handler = PlottingHandler()
 
     def normalize_weights(self):
         for connName in self.connections:
@@ -196,16 +187,12 @@ class Runner:
                 self.experiment_hyperparameters.test_mode
                 or str(self.experiment_hyperparameters.weight_path)[-7:] == "weights"
             ):
+                file_name = (
+                    "theta_" + name + self.experiment_hyperparameters.ending + ".npy"
+                )
+
                 self.neuron_groups["e"].theta = (
-                    np.load(
-                        self.experiment_hyperparameters.weight_path
-                        / (
-                            "theta_"
-                            + name
-                            + self.experiment_hyperparameters.ending
-                            + ".npy"
-                        )
-                    )
+                    np.load(self.experiment_hyperparameters.weight_path / file_name)
                     * b2.volt
                 )
             else:
@@ -361,36 +348,19 @@ class Runner:
             (self.experiment_hyperparameters.num_examples, 10)
         )
 
-        # TODO: extract
-        input_weight_monitor: AxesImage | None = None
-        fig_weights: Figure | None = None
+        self.plotting_handler.plot_input_weights(
+            self.experiment_hyperparameters.test_mode,
+            self.experiment_hyperparameters.n_input,
+            self.experiment_hyperparameters.n_e,
+            self.connections,
+            self.synapse_model_hyperparameters.wmax_ee,
+        )
 
-        if not self.experiment_hyperparameters.test_mode:
-            input_weight_monitor, fig_weights = plot_2d_input_weights(
-                self.experiment_hyperparameters.n_input,
-                self.experiment_hyperparameters.n_e,
-                self.connections,
-                self.fig_num,
-                self.synapse_model_hyperparameters.wmax_ee,
-            )
-            self.fig_num += 1
-
-        # TODO: extract
-        performance_monitor: Line2D | None = None
-        performance: np.ndarray | None = None
-        fig_performance: b2.Figure | None = None
-
-        if self.experiment_hyperparameters.do_plot_performance:
-            (
-                performance_monitor,
-                performance,
-                self.fig_num,
-                fig_performance,
-            ) = plot_performance(
-                self.fig_num,
-                self.experiment_hyperparameters.num_examples,
-                self.experiment_hyperparameters.update_interval,
-            )
+        self.plotting_handler.plot_performance(
+            self.experiment_hyperparameters.do_plot_performance,
+            self.experiment_hyperparameters.num_examples,
+            self.experiment_hyperparameters.update_interval,
+        )
 
         for i, name in enumerate(
             self.network_architecture_hyperparameters.input_population_names
@@ -473,8 +443,13 @@ class Runner:
                     ],
                 )
 
-            self.plot_input_weights_conditionally(
-                fig_weights, input_weight_monitor, iteration
+            self.plotting_handler.update_input_weights_plot(
+                iteration,
+                self.experiment_hyperparameters.weight_update_interval,
+                self.experiment_hyperparameters.test_mode,
+                self.experiment_hyperparameters.n_input,
+                self.experiment_hyperparameters.n_e,
+                self.connections,
             )
 
             if (
@@ -547,13 +522,12 @@ class Runner:
                         int(self.experiment_hyperparameters.num_examples),
                     )
 
-                self.plot_performance_conditionally(
-                    fig_performance,
-                    input_numbers,
+                self.plotting_handler.update_performance_plot(
                     iteration,
+                    self.experiment_hyperparameters.update_interval,
+                    self.experiment_hyperparameters.do_plot_performance,
+                    input_numbers,
                     output_numbers,
-                    performance,
-                    performance_monitor,
                 )
 
                 for i, name in enumerate(
@@ -600,8 +574,7 @@ class Runner:
                 input_numbers,
             )
 
-        plot_results(
-            fig_num=self.fig_num,
+        self.plotting_handler.plot_results(
             rate_monitors=self.rate_monitors,
             spike_monitors=self.spike_monitors,
             spike_counters=self.spike_counters,
@@ -609,59 +582,6 @@ class Runner:
             n_input=self.experiment_hyperparameters.n_input,
             n_e=self.experiment_hyperparameters.n_e,
             weight_max_ee=self.synapse_model_hyperparameters.wmax_ee,
-        )
-
-    def plot_input_weights_conditionally(
-        self, fig_weights, input_weight_monitor, iteration
-    ):
-        if (
-            iteration % self.experiment_hyperparameters.weight_update_interval == 0
-            and not self.experiment_hyperparameters.test_mode
-        ):
-            update_2d_input_weights(
-                input_weight_monitor,
-                fig_weights,
-                self.experiment_hyperparameters.n_input,
-                self.experiment_hyperparameters.n_e,
-                self.connections,
-            )
-            b2.pause(0.1)  # triggers update of the plots
-
-    def plot_performance_conditionally(
-        self,
-        fig_performance,
-        input_numbers,
-        iteration,
-        output_numbers,
-        performance,
-        performance_monitor,
-    ):
-        should_update = (
-            iteration % self.experiment_hyperparameters.update_interval == 0
-            and iteration > 0
-        )
-
-        if not should_update:
-            return
-
-        if not self.experiment_hyperparameters.do_plot_performance:
-            return
-
-        unused, performance = update_performance_plot(
-            performance_monitor,
-            performance,
-            iteration,
-            fig_performance,
-            self.experiment_hyperparameters.update_interval,
-            output_numbers,
-            input_numbers,
-        )
-
-        index = int(iteration / float(self.experiment_hyperparameters.update_interval))
-
-        print(
-            "Classification performance",
-            performance[: index + 1],
         )
 
 
