@@ -44,11 +44,8 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.experiment_hyperparameters = ExperimentHyperparameters.get_default(
-            test_mode=False
+            test_mode=True
         )
-        self.experiment_hyperparameters.num_examples = 1000
-        self.experiment_hyperparameters.weight_update_interval = 20
-        self.experiment_hyperparameters.update_interval = 100
 
         self.neuron_model_hyperparameters = NeuronModelHyperparameters.get_default()
 
