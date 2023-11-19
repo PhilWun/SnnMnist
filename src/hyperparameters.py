@@ -249,3 +249,27 @@ class ModelEquations:
             eqs_stdp_pre_ee=eqs_stdp_pre_ee,
             eqs_stdp_post_ee=eqs_stdp_post_ee,
         )
+
+    @staticmethod
+    def create_variable_namespace(
+        neuron_model_hyperparameters: NeuronModelHyperparameters,
+        synapse_model_hyperparameters: SynapseModelHyperparameters,
+    ):
+        return {
+            "v_rest_e": neuron_model_hyperparameters.v_rest_e,
+            "v_rest_i": neuron_model_hyperparameters.v_rest_i,
+            "v_thresh_e": neuron_model_hyperparameters.v_thresh_e,
+            "v_thresh_i": neuron_model_hyperparameters.v_thresh_i,
+            "refrac_e": neuron_model_hyperparameters.refrac_e,
+            "v_reset_e": neuron_model_hyperparameters.v_rest_e,
+            "v_reset_i": neuron_model_hyperparameters.v_reset_i,
+            "nu_ee_pre": synapse_model_hyperparameters.nu_ee_pre,
+            "tc_post_1_ee": synapse_model_hyperparameters.tc_post_1_ee,
+            "tc_post_2_ee": synapse_model_hyperparameters.tc_post_2_ee,
+            "tc_pre_ee": synapse_model_hyperparameters.tc_pre_ee,
+            "wmax_ee": synapse_model_hyperparameters.wmax_ee,
+            "nu_ee_post": synapse_model_hyperparameters.nu_ee_post,
+            "offset": synapse_model_hyperparameters.offset,
+            "tc_theta": synapse_model_hyperparameters.tc_theta,
+            "theta_plus_e": synapse_model_hyperparameters.theta_plus_e,
+        }

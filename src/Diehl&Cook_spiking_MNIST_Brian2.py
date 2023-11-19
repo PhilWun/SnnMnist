@@ -367,32 +367,11 @@ class Runner:
         ):
             self.input_groups[name + "e"].rates = 0 * b2.Hz
 
-        equation_variables = {
-            "v_rest_e": self.neuron_model_hyperparameters.v_rest_e,
-            "v_rest_i": self.neuron_model_hyperparameters.v_rest_i,
-            "v_thresh_e": self.neuron_model_hyperparameters.v_thresh_e,
-            "v_thresh_i": self.neuron_model_hyperparameters.v_thresh_i,
-            "refrac_e": self.neuron_model_hyperparameters.refrac_e,
-            "v_reset_e": self.neuron_model_hyperparameters.v_rest_e,
-            "v_reset_i": self.neuron_model_hyperparameters.v_reset_i,
-            "nu_ee_pre": self.synapse_model_hyperparameters.nu_ee_pre,
-            "tc_post_1_ee": self.synapse_model_hyperparameters.tc_post_1_ee,
-            "tc_post_2_ee": self.synapse_model_hyperparameters.tc_post_2_ee,
-            "tc_pre_ee": self.synapse_model_hyperparameters.tc_pre_ee,
-            "wmax_ee": self.synapse_model_hyperparameters.wmax_ee,
-            "nu_ee_post": self.synapse_model_hyperparameters.nu_ee_post,
-            "offset": self.synapse_model_hyperparameters.offset,
-        }
+        variable_namespace = ModelEquations.create_variable_namespace(
+            self.neuron_model_hyperparameters, self.synapse_model_hyperparameters
+        )
 
-        if not self.experiment_hyperparameters.test_mode:
-            equation_variables.update(
-                {
-                    "tc_theta": self.synapse_model_hyperparameters.tc_theta,
-                    "theta_plus_e": self.synapse_model_hyperparameters.theta_plus_e,
-                }
-            )
-
-        net.run(0 * b2.second, namespace=equation_variables)
+        net.run(0 * b2.second, namespace=variable_namespace)
         iteration: int = 0
 
         while iteration < (int(self.experiment_hyperparameters.num_examples)):
@@ -428,7 +407,7 @@ class Runner:
             net.run(
                 self.experiment_hyperparameters.single_example_time,
                 report="text",
-                namespace=equation_variables,
+                namespace=variable_namespace,
             )
 
             if (
@@ -488,7 +467,7 @@ class Runner:
 
                 net.run(
                     self.experiment_hyperparameters.resting_time,
-                    namespace=equation_variables,
+                    namespace=variable_namespace,
                 )
             else:
                 self.result_monitor[
@@ -537,7 +516,7 @@ class Runner:
 
                 net.run(
                     self.experiment_hyperparameters.resting_time,
-                    namespace=equation_variables,
+                    namespace=variable_namespace,
                 )
                 self.network_architecture_hyperparameters.input_intensity = (
                     self.network_architecture_hyperparameters.start_input_intensity
