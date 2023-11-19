@@ -98,26 +98,27 @@ class Runner:
 
     def normalize_weights(self):
         for connName in self.connections:
-            if connName[1] == "e" and connName[3] == "e":
-                len_source = len(self.connections[connName].source)
-                len_target = len(self.connections[connName].target)
-                connection = np.zeros((len_source, len_target))
-                connection[
-                    self.connections[connName].i, self.connections[connName].j
-                ] = self.connections[connName].w
-                temp_conn = np.copy(connection)
-                col_sums = np.sum(temp_conn, axis=0)
-                col_factors = (
-                    self.network_architecture_hyperparameters.weight["ee_input"]
-                    / col_sums
-                )
+            if not (connName[1] == "e" and connName[3] == "e"):
+                continue
 
-                for j in range(self.experiment_hyperparameters.n_e):  #
-                    temp_conn[:, j] *= col_factors[j]
+            len_source = len(self.connections[connName].source)
+            len_target = len(self.connections[connName].target)
+            connection = np.zeros((len_source, len_target))
+            connection[
+                self.connections[connName].i, self.connections[connName].j
+            ] = self.connections[connName].w
+            temp_conn = np.copy(connection)
+            col_sums = np.sum(temp_conn, axis=0)
+            col_factors = (
+                self.network_architecture_hyperparameters.weight["ee_input"] / col_sums
+            )
 
-                self.connections[connName].w = temp_conn[
-                    self.connections[connName].i, self.connections[connName].j
-                ]
+            for j in range(self.experiment_hyperparameters.n_e):  #
+                temp_conn[:, j] *= col_factors[j]
+
+            self.connections[connName].w = temp_conn[
+                self.connections[connName].i, self.connections[connName].j
+            ]
 
     @staticmethod
     def get_recognized_number_ranking(
@@ -376,8 +377,10 @@ class Runner:
 
         if self.experiment_hyperparameters.use_testing_set:
             input_data = self.testing_data["x"]
+            target_data = self.testing_data["y"]
         else:
             input_data = self.training_data["x"]
+            target_data = self.training_data["y"]
 
         while iteration < (int(self.experiment_hyperparameters.num_examples)):
             if not self.experiment_hyperparameters.test_mode:
@@ -460,17 +463,7 @@ class Runner:
                     iteration % self.experiment_hyperparameters.update_interval, :
                 ] = current_spike_count
 
-                if (
-                    self.experiment_hyperparameters.test_mode
-                    and self.experiment_hyperparameters.use_testing_set
-                ):
-                    input_numbers[iteration] = self.testing_data["y"][
-                        iteration % 10000
-                    ][0].item()
-                else:
-                    input_numbers[iteration] = self.training_data["y"][
-                        iteration % 60000
-                    ][0].item()
+                input_numbers[iteration] = target_data[data_index][0].item()
 
                 output_numbers[iteration, :] = self.get_recognized_number_ranking(
                     assignments,
