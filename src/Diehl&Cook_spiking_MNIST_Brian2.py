@@ -44,8 +44,11 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.experiment_hyperparameters = ExperimentHyperparameters.get_default(
-            test_mode=True
+            test_mode=False
         )
+        self.experiment_hyperparameters.num_examples = 1000
+        self.experiment_hyperparameters.weight_update_interval = 20
+        self.experiment_hyperparameters.update_interval = 100
 
         self.neuron_model_hyperparameters = NeuronModelHyperparameters.get_default()
 
@@ -158,8 +161,6 @@ class Runner:
         # ------------------------------------------------------------------------------
         # create network population and recurrent connections
         # ------------------------------------------------------------------------------
-        name: str
-        subgroup_n: int
 
         for subgroup_n, name in enumerate(
             self.network_architecture_hyperparameters.population_names
@@ -202,8 +203,6 @@ class Runner:
                 )
 
             print("create recurrent connections")
-
-            conn_type: str
 
             for (
                 conn_type
@@ -267,8 +266,6 @@ class Runner:
         # ------------------------------------------------------------------------------
         # create input population and connections from input populations
         # ------------------------------------------------------------------------------
-        i: int
-        name: str
 
         for i, name in enumerate(
             self.network_architecture_hyperparameters.input_population_names
@@ -448,16 +445,6 @@ class Runner:
 
             if np.sum(current_spike_count) < 5:
                 self.network_architecture_hyperparameters.input_intensity += 1
-
-                for i, name in enumerate(
-                    self.network_architecture_hyperparameters.input_population_names
-                ):
-                    self.input_groups[name + "e"].rates = 0 * b2.Hz
-
-                net.run(
-                    self.experiment_hyperparameters.resting_time,
-                    namespace=variable_namespace,
-                )
             else:
                 self.result_monitor[
                     iteration % self.experiment_hyperparameters.update_interval, :
@@ -474,10 +461,7 @@ class Runner:
 
                 if iteration % 100 == 0 and iteration > 0:
                     print(
-                        "runs done:",
-                        iteration,
-                        "of",
-                        int(self.experiment_hyperparameters.num_examples),
+                        f"runs done: {iteration} of {int(self.experiment_hyperparameters.num_examples)}",
                     )
 
                 self.plotting_handler.update_performance_plot(
@@ -488,19 +472,20 @@ class Runner:
                     output_numbers,
                 )
 
-                for i, name in enumerate(
-                    self.network_architecture_hyperparameters.input_population_names
-                ):
-                    self.input_groups[name + "e"].rates = 0 * b2.Hz
-
-                net.run(
-                    self.experiment_hyperparameters.resting_time,
-                    namespace=variable_namespace,
-                )
                 self.network_architecture_hyperparameters.input_intensity = (
                     self.network_architecture_hyperparameters.start_input_intensity
                 )
                 iteration += 1
+
+            for i, name in enumerate(
+                self.network_architecture_hyperparameters.input_population_names
+            ):
+                self.input_groups[name + "e"].rates = 0 * b2.Hz
+
+            net.run(
+                self.experiment_hyperparameters.resting_time,
+                namespace=variable_namespace,
+            )
 
         # ------------------------------------------------------------------------------
         # save results
