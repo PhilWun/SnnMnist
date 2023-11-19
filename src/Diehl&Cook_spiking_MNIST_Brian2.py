@@ -374,33 +374,19 @@ class Runner:
         net.run(0 * b2.second, namespace=variable_namespace)
         iteration: int = 0
 
+        if self.experiment_hyperparameters.use_testing_set:
+            input_data = self.testing_data["x"]
+        else:
+            input_data = self.training_data["x"]
+
         while iteration < (int(self.experiment_hyperparameters.num_examples)):
-            if self.experiment_hyperparameters.test_mode:
-                if self.experiment_hyperparameters.use_testing_set:
-                    spike_rates = (
-                        self.testing_data["x"][iteration % 10000, :, :].reshape(
-                            (self.experiment_hyperparameters.n_input,)
-                        )
-                        / 8.0
-                        * self.network_architecture_hyperparameters.input_intensity
-                    )
-                else:
-                    spike_rates = (
-                        self.training_data["x"][iteration % 60000, :, :].reshape(
-                            (self.experiment_hyperparameters.n_input,)
-                        )
-                        / 8.0
-                        * self.network_architecture_hyperparameters.input_intensity
-                    )
-            else:
+            if not self.experiment_hyperparameters.test_mode:
                 self.normalize_weights()
-                spike_rates = (
-                    self.training_data["x"][iteration % 60000, :, :].reshape(
-                        (self.experiment_hyperparameters.n_input,)
-                    )
-                    / 8.0
-                    * self.network_architecture_hyperparameters.input_intensity
-                )
+
+            data_index = iteration % input_data.shape[0]
+            spike_rates = input_data[data_index, :, :].reshape((-1,)).astype(np.float64)
+            spike_rates /= 8.0
+            spike_rates *= self.network_architecture_hyperparameters.input_intensity
 
             self.input_groups["Xe"].rates = spike_rates * b2.Hz
             #     print 'run number:', j+1, 'of', int(num_examples)
