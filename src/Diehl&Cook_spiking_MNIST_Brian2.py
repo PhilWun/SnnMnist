@@ -43,21 +43,11 @@ class Runner:
         # ------------------------------------------------------------------------------
         # set parameters and equations
         # ------------------------------------------------------------------------------
-        self.experiment_hyperparameters = ExperimentHyperparameters.get_default(
-            test_mode=True
-        )
-
-        self.neuron_model_hyperparameters = NeuronModelHyperparameters.get_default()
-
-        self.network_architecture_hyperparameters = (
-            NetworkArchitectureHyperparameters.get_default()
-        )
-
-        self.synapse_model_hyperparameters = SynapseModelHyperparameters.get_default()
-
-        self.model_equations = ModelEquations.get_default(
-            self.experiment_hyperparameters.test_mode
-        )
+        self.exp_hyper = ExperimentHyperparameters.get_default(test_mode=True)
+        self.neuron_hyper = NeuronModelHyperparameters.get_default()
+        self.net_hyper = NetworkArchitectureHyperparameters.get_default()
+        self.syn_hyper = SynapseModelHyperparameters.get_default()
+        self.model_equations = ModelEquations.get_default(self.exp_hyper.test_mode)
 
         self.neuron_groups = {}
         self.input_groups: Dict[str, b2.PoissonGroup] = {}
@@ -67,26 +57,24 @@ class Runner:
         self.spike_counters: Dict[str, b2.SpikeMonitor] = {}
         self.result_monitor: np.ndarray = np.zeros(
             (
-                self.experiment_hyperparameters.update_interval,
-                self.experiment_hyperparameters.n_e,
+                self.exp_hyper.update_interval,
+                self.exp_hyper.n_e,
             )
         )
 
         self.neuron_groups["e"] = b2.NeuronGroup(
-            self.experiment_hyperparameters.n_e
-            * len(self.network_architecture_hyperparameters.population_names),
+            self.exp_hyper.n_e * len(self.net_hyper.population_names),
             self.model_equations.neuron_eqs_e,
             threshold=self.model_equations.v_thresh_e_eqs,
-            refractory=self.neuron_model_hyperparameters.refrac_e,
+            refractory=self.neuron_hyper.refrac_e,
             reset=self.model_equations.scr_e,
             method="euler",
         )
         self.neuron_groups["i"] = b2.NeuronGroup(
-            self.experiment_hyperparameters.n_i
-            * len(self.network_architecture_hyperparameters.population_names),
+            self.exp_hyper.n_i * len(self.net_hyper.population_names),
             self.model_equations.neuron_eqs_i,
             threshold=self.model_equations.v_thresh_i_eqs,
-            refractory=self.neuron_model_hyperparameters.refrac_i,
+            refractory=self.neuron_hyper.refrac_i,
             reset=self.model_equations.v_reset_i_eqs,
             method="euler",
         )
@@ -109,11 +97,9 @@ class Runner:
             ] = self.connections[connName].w
             temp_conn = np.copy(connection)
             col_sums = np.sum(temp_conn, axis=0)
-            col_factors = (
-                self.network_architecture_hyperparameters.weight["ee_input"] / col_sums
-            )
+            col_factors = self.net_hyper.weight["ee_input"] / col_sums
 
-            for j in range(self.experiment_hyperparameters.n_e):  #
+            for j in range(self.exp_hyper.n_e):  #
                 temp_conn[:, j] *= col_factors[j]
 
             self.connections[connName].w = temp_conn[
@@ -137,9 +123,9 @@ class Runner:
         return np.argsort(summed_rates)[::-1]
 
     def get_new_assignments(self, result_monitor: np.ndarray, input_numbers: List[int]):
-        assignments: np.ndarray = np.zeros(self.experiment_hyperparameters.n_e)
+        assignments: np.ndarray = np.zeros(self.exp_hyper.n_e)
         input_nums: np.ndarray = np.asarray(input_numbers)
-        maximum_rate: List[float] = [0] * self.experiment_hyperparameters.n_e
+        maximum_rate: List[float] = [0] * self.exp_hyper.n_e
 
         for j in range(10):
             num_assignments = len(np.where(input_nums == j)[0])
@@ -147,7 +133,7 @@ class Runner:
 
             rate = np.sum(result_monitor[input_nums == j], axis=0) / num_assignments
 
-            for i in range(self.experiment_hyperparameters.n_e):
+            for i in range(self.exp_hyper.n_e):
                 if rate[i] > maximum_rate[i]:
                     maximum_rate[i] = rate[i]
                     assignments[i] = j
@@ -159,71 +145,53 @@ class Runner:
         # create network population and recurrent connections
         # ------------------------------------------------------------------------------
 
-        for subgroup_n, name in enumerate(
-            self.network_architecture_hyperparameters.population_names
-        ):
+        for subgroup_n, name in enumerate(self.net_hyper.population_names):
             print("create neuron group", name)
 
             self.neuron_groups[name + "e"] = self.neuron_groups["e"][
-                subgroup_n
-                * self.experiment_hyperparameters.n_e : (subgroup_n + 1)
-                * self.experiment_hyperparameters.n_e
+                subgroup_n * self.exp_hyper.n_e : (subgroup_n + 1) * self.exp_hyper.n_e
             ]
             self.neuron_groups[name + "i"] = self.neuron_groups["i"][
-                subgroup_n
-                * self.experiment_hyperparameters.n_i : (subgroup_n + 1)
-                * self.experiment_hyperparameters.n_e
+                subgroup_n * self.exp_hyper.n_i : (subgroup_n + 1) * self.exp_hyper.n_e
             ]
 
-            self.neuron_groups[name + "e"].v = (
-                self.neuron_model_hyperparameters.v_rest_e - 40.0 * b2.mV
-            )
-            self.neuron_groups[name + "i"].v = (
-                self.neuron_model_hyperparameters.v_rest_i - 40.0 * b2.mV
-            )
+            self.neuron_groups[name + "e"].v = self.neuron_hyper.v_rest_e - 40.0 * b2.mV
+            self.neuron_groups[name + "i"].v = self.neuron_hyper.v_rest_i - 40.0 * b2.mV
 
             if (
-                self.experiment_hyperparameters.test_mode
-                or str(self.experiment_hyperparameters.weight_path)[-7:] == "weights"
+                self.exp_hyper.test_mode
+                or str(self.exp_hyper.weight_path)[-7:] == "weights"
             ):
-                file_name = (
-                    "theta_" + name + self.experiment_hyperparameters.ending + ".npy"
-                )
+                file_name = "theta_" + name + self.exp_hyper.ending + ".npy"
 
                 self.neuron_groups["e"].theta = (
-                    np.load(self.experiment_hyperparameters.weight_path / file_name)
-                    * b2.volt
+                    np.load(self.exp_hyper.weight_path / file_name) * b2.volt
                 )
             else:
                 self.neuron_groups["e"].theta = (
-                    np.ones((self.experiment_hyperparameters.n_e,)) * 20.0 * b2.mV
+                    np.ones((self.exp_hyper.n_e,)) * 20.0 * b2.mV
                 )
 
             print("create recurrent connections")
 
-            for (
-                conn_type
-            ) in self.network_architecture_hyperparameters.recurrent_conn_names:
+            for conn_type in self.net_hyper.recurrent_conn_names:
                 conn_name = name + conn_type[0] + name + conn_type[1]
                 weight_matrix = get_matrix_from_file(
-                    self.experiment_hyperparameters.weight_path
+                    self.exp_hyper.weight_path
                     / ".."
                     / "random"
-                    / (conn_name + self.experiment_hyperparameters.ending + ".npy"),
-                    self.experiment_hyperparameters.ending,
-                    self.experiment_hyperparameters.n_input,
-                    self.experiment_hyperparameters.n_e,
-                    self.experiment_hyperparameters.n_i,
+                    / (conn_name + self.exp_hyper.ending + ".npy"),
+                    self.exp_hyper.ending,
+                    self.exp_hyper.n_input,
+                    self.exp_hyper.n_e,
+                    self.exp_hyper.n_i,
                 )
                 model = "w : 1"
                 pre = f"g{conn_type[0]}_post += w"
                 post = ""
 
-                if self.experiment_hyperparameters.ee_stdp_on:
-                    if (
-                        "ee"
-                        in self.network_architecture_hyperparameters.recurrent_conn_names
-                    ):
+                if self.exp_hyper.ee_stdp_on:
+                    if "ee" in self.net_hyper.recurrent_conn_names:
                         model += self.model_equations.eqs_stdp_ee
                         pre += "; " + self.model_equations.eqs_stdp_pre_ee
                         post = self.model_equations.eqs_stdp_post_ee
@@ -251,7 +219,7 @@ class Runner:
                 self.neuron_groups[name + "e"], record=False
             )
 
-            if self.experiment_hyperparameters.record_spikes:
+            if self.exp_hyper.record_spikes:
                 self.spike_monitors[name + "e"] = b2.SpikeMonitor(
                     self.neuron_groups[name + "e"]
                 )
@@ -264,34 +232,32 @@ class Runner:
         # create input population and connections from input populations
         # ------------------------------------------------------------------------------
 
-        for i, name in enumerate(
-            self.network_architecture_hyperparameters.input_population_names
-        ):
+        for i, name in enumerate(self.net_hyper.input_population_names):
             self.input_groups[name + "e"] = b2.PoissonGroup(
-                self.experiment_hyperparameters.n_input, 0 * b2.Hz
+                self.exp_hyper.n_input, 0 * b2.Hz
             )
             self.rate_monitors[name + "e"] = b2.PopulationRateMonitor(
                 self.input_groups[name + "e"]
             )
 
-        for name in self.network_architecture_hyperparameters.input_connection_names:
+        for name in self.net_hyper.input_connection_names:
             print("create connections between", name[0], "and", name[1])
 
-            for conn_type in self.network_architecture_hyperparameters.input_conn_names:
+            for conn_type in self.net_hyper.input_conn_names:
                 conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
                 weight_matrix = get_matrix_from_file(
-                    self.experiment_hyperparameters.weight_path
-                    / (conn_name + self.experiment_hyperparameters.ending + ".npy"),
-                    self.experiment_hyperparameters.ending,
-                    self.experiment_hyperparameters.n_input,
-                    self.experiment_hyperparameters.n_e,
-                    self.experiment_hyperparameters.n_i,
+                    self.exp_hyper.weight_path
+                    / (conn_name + self.exp_hyper.ending + ".npy"),
+                    self.exp_hyper.ending,
+                    self.exp_hyper.n_input,
+                    self.exp_hyper.n_e,
+                    self.exp_hyper.n_i,
                 )
                 model = "w : 1"
                 pre = f"g{conn_type[0]}_post += w"
                 post = ""
 
-                if self.experiment_hyperparameters.ee_stdp_on:
+                if self.exp_hyper.ee_stdp_on:
                     print("create STDP for connection", name[0] + "e" + name[1] + "e")
                     model += self.model_equations.eqs_stdp_ee
                     pre += "; " + self.model_equations.eqs_stdp_pre_ee
@@ -304,12 +270,8 @@ class Runner:
                     on_pre=pre,
                     on_post=post,
                 )
-                min_delay = self.network_architecture_hyperparameters.delay[conn_type][
-                    0
-                ]
-                max_delay = self.network_architecture_hyperparameters.delay[conn_type][
-                    1
-                ]
+                min_delay = self.net_hyper.delay[conn_type][0]
+                max_delay = self.net_hyper.delay[conn_type][1]
                 delta_delay = max_delay - min_delay
 
                 self.connections[conn_name].connect(True)  # all-to-all connection
@@ -336,99 +298,90 @@ class Runner:
             for key in obj_list:
                 net.add(obj_list[key])
 
-        previous_spike_count: np.ndarray = np.zeros(self.experiment_hyperparameters.n_e)
-        assignments: np.ndarray = np.zeros(self.experiment_hyperparameters.n_e)
-        input_numbers: List[int] = [0] * self.experiment_hyperparameters.num_examples
-        output_numbers: np.ndarray = np.zeros(
-            (self.experiment_hyperparameters.num_examples, 10)
-        )
+        previous_spike_count: np.ndarray = np.zeros(self.exp_hyper.n_e)
+        assignments: np.ndarray = np.zeros(self.exp_hyper.n_e)
+        input_numbers: List[int] = [0] * self.exp_hyper.num_examples
+        output_numbers: np.ndarray = np.zeros((self.exp_hyper.num_examples, 10))
 
         self.plotting_handler.plot_input_weights(
-            self.experiment_hyperparameters.test_mode,
-            self.experiment_hyperparameters.n_input,
-            self.experiment_hyperparameters.n_e,
+            self.exp_hyper.test_mode,
+            self.exp_hyper.n_input,
+            self.exp_hyper.n_e,
             self.connections,
-            self.synapse_model_hyperparameters.wmax_ee,
+            self.syn_hyper.wmax_ee,
         )
 
         self.plotting_handler.plot_performance(
-            self.experiment_hyperparameters.do_plot_performance,
-            self.experiment_hyperparameters.num_examples,
-            self.experiment_hyperparameters.update_interval,
+            self.exp_hyper.do_plot_performance,
+            self.exp_hyper.num_examples,
+            self.exp_hyper.update_interval,
         )
 
-        for i, name in enumerate(
-            self.network_architecture_hyperparameters.input_population_names
-        ):
+        for i, name in enumerate(self.net_hyper.input_population_names):
             self.input_groups[name + "e"].rates = 0 * b2.Hz
 
         variable_namespace = ModelEquations.create_variable_namespace(
-            self.neuron_model_hyperparameters, self.synapse_model_hyperparameters
+            self.neuron_hyper, self.syn_hyper
         )
 
         net.run(0 * b2.second, namespace=variable_namespace)
         iteration: int = 0
 
-        if self.experiment_hyperparameters.use_testing_set:
+        if self.exp_hyper.use_testing_set:
             input_data = self.testing_data["x"]
             target_data = self.testing_data["y"]
         else:
             input_data = self.training_data["x"]
             target_data = self.training_data["y"]
 
-        while iteration < (int(self.experiment_hyperparameters.num_examples)):
-            if not self.experiment_hyperparameters.test_mode:
+        while iteration < (int(self.exp_hyper.num_examples)):
+            if not self.exp_hyper.test_mode:
                 self.normalize_weights()
 
             data_index = iteration % input_data.shape[0]
             spike_rates = input_data[data_index, :, :].reshape((-1,)).astype(np.float64)
             spike_rates /= 8.0
-            spike_rates *= self.network_architecture_hyperparameters.input_intensity
+            spike_rates *= self.net_hyper.input_intensity
 
             self.input_groups["Xe"].rates = spike_rates * b2.Hz
             #     print 'run number:', j+1, 'of', int(num_examples)
             net.run(
-                self.experiment_hyperparameters.single_example_time,
+                self.exp_hyper.single_example_time,
                 report="text",
                 namespace=variable_namespace,
             )
 
-            if (
-                iteration % self.experiment_hyperparameters.update_interval == 0
-                and iteration > 0
-            ):
+            if iteration % self.exp_hyper.update_interval == 0 and iteration > 0:
                 assignments = self.get_new_assignments(
                     self.result_monitor[:],
                     input_numbers[
-                        iteration
-                        - self.experiment_hyperparameters.update_interval : iteration
+                        iteration - self.exp_hyper.update_interval : iteration
                     ],
                 )
 
             self.plotting_handler.update_input_weights_plot(
                 iteration,
-                self.experiment_hyperparameters.weight_update_interval,
-                self.experiment_hyperparameters.test_mode,
-                self.experiment_hyperparameters.n_input,
-                self.experiment_hyperparameters.n_e,
+                self.exp_hyper.weight_update_interval,
+                self.exp_hyper.test_mode,
+                self.exp_hyper.n_input,
+                self.exp_hyper.n_e,
                 self.connections,
             )
 
             if (
-                iteration % self.experiment_hyperparameters.save_connections_interval
-                == 0
+                iteration % self.exp_hyper.save_connections_interval == 0
                 and iteration > 0
-                and not self.experiment_hyperparameters.test_mode
+                and not self.exp_hyper.test_mode
             ):
                 save_connections(
-                    self.network_architecture_hyperparameters.save_conns,
+                    self.net_hyper.save_conns,
                     self.connections,
-                    self.experiment_hyperparameters.data_path,
+                    self.exp_hyper.data_path,
                     str(iteration),
                 )
                 save_theta(
-                    self.network_architecture_hyperparameters.population_names,
-                    self.experiment_hyperparameters.data_path,
+                    self.net_hyper.population_names,
+                    self.exp_hyper.data_path,
                     self.neuron_groups,
                     str(iteration),
                 )
@@ -441,46 +394,40 @@ class Runner:
             )
 
             if np.sum(current_spike_count) < 5:
-                self.network_architecture_hyperparameters.input_intensity += 1
+                self.net_hyper.input_intensity += 1
             else:
                 self.result_monitor[
-                    iteration % self.experiment_hyperparameters.update_interval, :
+                    iteration % self.exp_hyper.update_interval, :
                 ] = current_spike_count
 
                 input_numbers[iteration] = target_data[data_index][0].item()
 
                 output_numbers[iteration, :] = self.get_recognized_number_ranking(
                     assignments,
-                    self.result_monitor[
-                        iteration % self.experiment_hyperparameters.update_interval, :
-                    ],
+                    self.result_monitor[iteration % self.exp_hyper.update_interval, :],
                 )
 
                 if iteration % 100 == 0 and iteration > 0:
                     print(
-                        f"runs done: {iteration} of {int(self.experiment_hyperparameters.num_examples)}",
+                        f"runs done: {iteration} of {int(self.exp_hyper.num_examples)}",
                     )
 
                 self.plotting_handler.update_performance_plot(
                     iteration,
-                    self.experiment_hyperparameters.update_interval,
-                    self.experiment_hyperparameters.do_plot_performance,
+                    self.exp_hyper.update_interval,
+                    self.exp_hyper.do_plot_performance,
                     input_numbers,
                     output_numbers,
                 )
 
-                self.network_architecture_hyperparameters.input_intensity = (
-                    self.network_architecture_hyperparameters.start_input_intensity
-                )
+                self.net_hyper.input_intensity = self.net_hyper.start_input_intensity
                 iteration += 1
 
-            for i, name in enumerate(
-                self.network_architecture_hyperparameters.input_population_names
-            ):
+            for i, name in enumerate(self.net_hyper.input_population_names):
                 self.input_groups[name + "e"].rates = 0 * b2.Hz
 
             net.run(
-                self.experiment_hyperparameters.resting_time,
+                self.exp_hyper.resting_time,
                 namespace=variable_namespace,
             )
 
@@ -488,29 +435,29 @@ class Runner:
         # save results
         # ------------------------------------------------------------------------------
         print("save results")
-        if not self.experiment_hyperparameters.test_mode:
+        if not self.exp_hyper.test_mode:
             save_theta(
-                self.network_architecture_hyperparameters.population_names,
-                self.experiment_hyperparameters.data_path,
+                self.net_hyper.population_names,
+                self.exp_hyper.data_path,
                 self.neuron_groups,
             )
-        if not self.experiment_hyperparameters.test_mode:
+        if not self.exp_hyper.test_mode:
             save_connections(
-                self.network_architecture_hyperparameters.save_conns,
+                self.net_hyper.save_conns,
                 self.connections,
-                self.experiment_hyperparameters.data_path,
+                self.exp_hyper.data_path,
             )
         else:
             np.save(
-                self.experiment_hyperparameters.data_path
+                self.exp_hyper.data_path
                 / "activity"
-                / ("resultPopVecs" + str(self.experiment_hyperparameters.num_examples)),
+                / ("resultPopVecs" + str(self.exp_hyper.num_examples)),
                 self.result_monitor,
             )
             np.save(
-                self.experiment_hyperparameters.data_path
+                self.exp_hyper.data_path
                 / "activity"
-                / ("inputNumbers" + str(self.experiment_hyperparameters.num_examples)),
+                / ("inputNumbers" + str(self.exp_hyper.num_examples)),
                 input_numbers,
             )
 
@@ -519,9 +466,9 @@ class Runner:
             spike_monitors=self.spike_monitors,
             spike_counters=self.spike_counters,
             connections=self.connections,
-            n_input=self.experiment_hyperparameters.n_input,
-            n_e=self.experiment_hyperparameters.n_e,
-            weight_max_ee=self.synapse_model_hyperparameters.wmax_ee,
+            n_input=self.exp_hyper.n_input,
+            n_e=self.exp_hyper.n_e,
+            weight_max_ee=self.syn_hyper.wmax_ee,
         )
 
 
