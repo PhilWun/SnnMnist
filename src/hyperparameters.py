@@ -14,6 +14,7 @@ class NeuronModelHyperparameters:
     v_reset_i: b2.Quantity
     v_thresh_e: b2.Quantity
     v_thresh_i: b2.Quantity
+    v_start_offset: b2.Quantity
     refrac_e: b2.Quantity
     refrac_i: b2.Quantity
 
@@ -26,6 +27,7 @@ class NeuronModelHyperparameters:
             v_reset_i=-45.0 * b2.mV,
             v_thresh_e=-52.0 * b2.mV,
             v_thresh_i=-40.0 * b2.mV,
+            v_start_offset=-40.0 * b2.mV,
             refrac_e=5.0 * b2.ms,
             refrac_i=2.0 * b2.ms,
         )
@@ -42,6 +44,7 @@ class SynapseModelHyperparameters:
     exp_ee_pre: float
     exp_ee_post: float
     STDP_offset: float
+    theta_start: b2.Quantity
     tc_theta: b2.Quantity
     theta_plus_e: b2.Quantity
     offset: b2.Quantity
@@ -58,6 +61,7 @@ class SynapseModelHyperparameters:
             exp_ee_pre=0.2,
             exp_ee_post=0.2,
             STDP_offset=0.4,
+            theta_start=20 * b2.mV,
             tc_theta=1e7 * b2.ms,
             theta_plus_e=0.05 * b2.mV,
             offset=20.0 * b2.mV,
@@ -99,6 +103,7 @@ class ExperimentHyperparameters:
             record_spikes = True
             ee_stdp_on = False
         else:
+            # TODO: replace loading random values from file with generating the random values
             weight_path = data_path / "random"
             num_examples = 60000 * 3
             use_testing_set = False
@@ -209,12 +214,12 @@ class ModelEquations:
         v_reset_i_eqs = "v=v_reset_i"
 
         neuron_eqs_e = """
-                       dv/dt = ((v_rest_e - v) + (I_synE+I_synI) / nS) / (100*ms)  : volt (unless refractory)
-                       I_synE = ge * nS *         -v                           : amp
-                       I_synI = gi * nS * (-100.*mV-v)                          : amp
-                       dge/dt = -ge/(1.0*ms)                                   : 1
-                       dgi/dt = -gi/(2.0*ms)                                  : 1
-                       """
+           dv/dt = ((v_rest_e - v) + (I_synE+I_synI) / nS) / (100*ms)  : volt (unless refractory)
+           I_synE = ge * nS *          -v                              : amp
+           I_synI = gi * nS * (-100.*mV-v)                             : amp
+           dge/dt = -ge/(1.0*ms)                                       : 1
+           dgi/dt = -gi/(2.0*ms)                                       : 1
+           """
 
         if test_mode:
             neuron_eqs_e += "\n  theta      :volt"
@@ -223,18 +228,18 @@ class ModelEquations:
         neuron_eqs_e += "\n  dtimer/dt = 0.1  : second"
 
         neuron_eqs_i = """
-                dv/dt = ((v_rest_i - v) + (I_synE+I_synI) / nS) / (10*ms)  : volt (unless refractory)
-                I_synE = ge * nS *         -v                           : amp
-                I_synI = gi * nS * (-85.*mV-v)                          : amp
-                dge/dt = -ge/(1.0*ms)                                   : 1
-                dgi/dt = -gi/(2.0*ms)                                  : 1
-                """
+            dv/dt = ((v_rest_i - v) + (I_synE+I_synI) / nS) / (10*ms)  : volt (unless refractory)
+            I_synE = ge * nS *         -v                              : amp
+            I_synI = gi * nS * (-85.*mV-v)                             : amp
+            dge/dt = -ge/(1.0*ms)                                      : 1
+            dgi/dt = -gi/(2.0*ms)                                      : 1
+            """
         eqs_stdp_ee = """
-                        post2before                            : 1
-                        dpre/dt   =   -pre/(tc_pre_ee)         : 1 (event-driven)
-                        dpost1/dt  = -post1/(tc_post_1_ee)     : 1 (event-driven)
-                        dpost2/dt  = -post2/(tc_post_2_ee)     : 1 (event-driven)
-                    """
+            post2before                            : 1
+            dpre/dt    = -pre/(tc_pre_ee)          : 1 (event-driven)
+            dpost1/dt  = -post1/(tc_post_1_ee)     : 1 (event-driven)
+            dpost2/dt  = -post2/(tc_post_2_ee)     : 1 (event-driven)
+            """
         eqs_stdp_pre_ee = "pre = 1.; w = clip(w + nu_ee_pre * post1, 0, wmax_ee)"
         eqs_stdp_post_ee = "post2before = post2; w = clip(w + nu_ee_post * pre * post2before, 0, wmax_ee); post1 = 1.; post2 = 1."
 

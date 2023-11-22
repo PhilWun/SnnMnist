@@ -155,22 +155,16 @@ class Runner:
                 subgroup_n * self.exp_hyper.n_i : (subgroup_n + 1) * self.exp_hyper.n_e
             ]
 
-            self.neuron_groups[name + "e"].v = self.neuron_hyper.v_rest_e - 40.0 * b2.mV
-            self.neuron_groups[name + "i"].v = self.neuron_hyper.v_rest_i - 40.0 * b2.mV
+            self.neuron_groups[name + "e"].v = (
+                self.neuron_hyper.v_rest_e + self.neuron_hyper.v_start_offset
+            )
+            self.neuron_groups[name + "i"].v = (
+                self.neuron_hyper.v_rest_i + self.neuron_hyper.v_start_offset
+            )
 
-            if (
-                self.exp_hyper.test_mode
-                or str(self.exp_hyper.weight_path)[-7:] == "weights"
-            ):
-                file_name = "theta_" + name + self.exp_hyper.ending + ".npy"
-
-                self.neuron_groups["e"].theta = (
-                    np.load(self.exp_hyper.weight_path / file_name) * b2.volt
-                )
-            else:
-                self.neuron_groups["e"].theta = (
-                    np.ones((self.exp_hyper.n_e,)) * 20.0 * b2.mV
-                )
+            self.neuron_groups["e"].theta = (
+                np.ones((self.exp_hyper.n_e,)) * self.syn_hyper.theta_start
+            )
 
             print("create recurrent connections")
 
