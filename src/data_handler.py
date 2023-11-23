@@ -102,7 +102,7 @@ def get_matrix_from_file(
 def save_connections(
     save_conns: List[str],
     connections: Dict[str, b2.Synapses],
-    data_path: Path,
+    weight_path: Path,
     ending="",
 ) -> None:
     print("save connections")
@@ -110,12 +110,12 @@ def save_connections(
     for connName in save_conns:
         conn = connections[connName]
         conn_list_sparse = np.stack([conn.i, conn.j, conn.w], axis=1)
-        np.save(data_path / "weights" / (connName + ending), conn_list_sparse)
+        np.save(weight_path / f"{connName}{ending}", conn_list_sparse)
 
 
 def save_theta(
     population_names: List[str],
-    data_path: Path,
+    weight_path: Path,
     neuron_groups: Dict[str, b2.NeuronGroup],
     ending="",
 ) -> None:
@@ -123,6 +123,6 @@ def save_theta(
 
     for pop_name in population_names:
         np.save(
-            data_path / "weights" / ("theta_" + pop_name + ending),
+            weight_path / f"theta_{pop_name}{ending}",
             neuron_groups[pop_name + "e"].theta,
         )

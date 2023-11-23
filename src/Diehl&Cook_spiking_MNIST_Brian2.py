@@ -44,9 +44,6 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.exp_hyper = ExperimentHyperparameters.get_default(test_mode=True)
-        self.exp_hyper.num_examples = 100
-        self.exp_hyper.weight_update_interval = 20
-        self.exp_hyper.update_interval = 100
 
         self.neuron_hyper = NeuronModelHyperparameters.get_default()
         self.net_hyper = NetworkArchitectureHyperparameters.get_default()
@@ -400,12 +397,12 @@ class Runner:
                 save_connections(
                     self.net_hyper.save_conns,
                     self.connections,
-                    self.exp_hyper.data_path,
+                    self.exp_hyper.weight_path,
                     str(iteration),
                 )
                 save_theta(
                     self.net_hyper.population_names,
-                    self.exp_hyper.data_path,
+                    self.exp_hyper.weight_path,
                     self.neuron_groups,
                     str(iteration),
                 )
@@ -462,26 +459,24 @@ class Runner:
         if not self.exp_hyper.test_mode:
             save_theta(
                 self.net_hyper.population_names,
-                self.exp_hyper.data_path,
+                self.exp_hyper.weight_path,
                 self.neuron_groups,
             )
         if not self.exp_hyper.test_mode:
             save_connections(
                 self.net_hyper.save_conns,
                 self.connections,
-                self.exp_hyper.data_path,
+                self.exp_hyper.weight_path,
             )
         else:
             np.save(
-                self.exp_hyper.data_path
-                / "activity"
-                / ("resultPopVecs" + str(self.exp_hyper.num_examples)),
+                self.exp_hyper.activity_path
+                / f"resultPopVecs{self.exp_hyper.num_examples}",
                 self.result_monitor,
             )
             np.save(
-                self.exp_hyper.data_path
-                / "activity"
-                / ("inputNumbers" + str(self.exp_hyper.num_examples)),
+                self.exp_hyper.activity_path
+                / f"inputNumbers{self.exp_hyper.num_examples}",
                 input_numbers,
             )
 

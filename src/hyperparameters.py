@@ -71,8 +71,8 @@ class SynapseModelHyperparameters:
 @dataclass
 class ExperimentHyperparameters:
     test_mode: bool
-    data_path: Path
     weight_path: Path
+    activity_path: Path
     num_examples: int
     use_testing_set: bool
     do_plot_performance: bool
@@ -93,18 +93,16 @@ class ExperimentHyperparameters:
     @staticmethod
     def get_default(test_mode: bool) -> "ExperimentHyperparameters":
         np.random.seed(0)
-        data_path = Path(".")
+        weight_path = Path("weights")
+        activity_path = Path("activity")
 
         if test_mode:
-            weight_path = data_path / "weights"
             num_examples = 10000 * 1
             use_testing_set = True
             do_plot_performance = False
             record_spikes = True
             ee_stdp_on = False
         else:
-            # TODO: replace loading random values from file with generating the random values
-            weight_path = data_path / "random"
             num_examples = 60000 * 3
             use_testing_set = False
             do_plot_performance = True
@@ -138,8 +136,8 @@ class ExperimentHyperparameters:
 
         return ExperimentHyperparameters(
             test_mode=test_mode,
-            data_path=data_path,
             weight_path=weight_path,
+            activity_path=activity_path,
             num_examples=num_examples,
             use_testing_set=use_testing_set,
             do_plot_performance=do_plot_performance,
