@@ -44,6 +44,10 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.exp_hyper = ExperimentHyperparameters.get_default(test_mode=True)
+        self.exp_hyper.num_examples = 100
+        self.exp_hyper.weight_update_interval = 20
+        self.exp_hyper.update_interval = 100
+
         self.neuron_hyper = NeuronModelHyperparameters.get_default()
         self.net_hyper = NetworkArchitectureHyperparameters.get_default()
         self.syn_hyper = SynapseModelHyperparameters.get_default()
@@ -162,29 +166,19 @@ class Runner:
                 self.neuron_hyper.v_rest_i + self.neuron_hyper.v_start_offset
             )
 
-            self.neuron_groups["e"].theta = (
-                np.ones((self.exp_hyper.n_e,)) * self.syn_hyper.theta_start
-            )
+            self.neuron_groups["e"].theta = self.generate_or_load_theta(name)
 
             print("create recurrent connections")
 
             for conn_type in self.net_hyper.recurrent_conn_names:
                 conn_name = name + conn_type[0] + name + conn_type[1]
-                weight_matrix = get_matrix_from_file(
-                    self.exp_hyper.weight_path
-                    / ".."
-                    / "random"
-                    / (conn_name + self.exp_hyper.ending + ".npy"),
-                    self.exp_hyper.ending,
-                    self.exp_hyper.n_input,
-                    self.exp_hyper.n_e,
-                    self.exp_hyper.n_i,
-                )
+                weight_matrix = self.generate_or_load_weights(conn_name)
                 model = "w : 1"
                 pre = f"g{conn_type[0]}_post += w"
                 post = ""
 
                 if self.exp_hyper.ee_stdp_on:
+                    # not true: STDP is not used for the recurrent connections
                     if "ee" in self.net_hyper.recurrent_conn_names:
                         model += self.model_equations.eqs_stdp_ee
                         pre += "; " + self.model_equations.eqs_stdp_pre_ee
@@ -239,14 +233,7 @@ class Runner:
 
             for conn_type in self.net_hyper.input_conn_names:
                 conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
-                weight_matrix = get_matrix_from_file(
-                    self.exp_hyper.weight_path
-                    / (conn_name + self.exp_hyper.ending + ".npy"),
-                    self.exp_hyper.ending,
-                    self.exp_hyper.n_input,
-                    self.exp_hyper.n_e,
-                    self.exp_hyper.n_i,
-                )
+                weight_matrix = self.generate_or_load_weights(conn_name)
                 model = "w : 1"
                 pre = f"g{conn_type[0]}_post += w"
                 post = ""
@@ -273,6 +260,49 @@ class Runner:
                 self.connections[conn_name].w = weight_matrix[
                     self.connections[conn_name].i, self.connections[conn_name].j
                 ]
+
+    def generate_or_load_weights(self, conn_name: str) -> np.ndarray:
+        load_from_file = (
+            conn_name in self.net_hyper.save_conns and self.exp_hyper.test_mode
+        )
+
+        if load_from_file:
+            return get_matrix_from_file(
+                self.exp_hyper.weight_path
+                / (conn_name + self.exp_hyper.ending + ".npy"),
+                self.exp_hyper.ending,
+                self.exp_hyper.n_input,
+                self.exp_hyper.n_e,
+                self.exp_hyper.n_i,
+            )
+        else:
+            if conn_name == "AeAi":
+                assert self.exp_hyper.n_e == self.exp_hyper.n_i
+                return np.eye(self.exp_hyper.n_e) * 10.4
+            elif conn_name == "AiAe":
+                assert self.exp_hyper.n_e == self.exp_hyper.n_i
+                n = self.exp_hyper.n_e
+                return (np.ones((n, n)) - np.eye(n)) * 17.0
+            elif conn_name == "XeAe":
+                return (
+                    np.random.random((self.exp_hyper.n_input, self.exp_hyper.n_e)) * 0.3
+                )
+            else:
+                raise ValueError(f"unknown connection name {conn_name}")
+
+    def generate_or_load_theta(self, sub_group_name: str) -> np.ndarray:
+        load_from_file = self.exp_hyper.test_mode
+
+        if load_from_file:
+            return (
+                np.load(
+                    self.exp_hyper.weight_path
+                    / f"theta_{sub_group_name}{self.exp_hyper.ending}.npy"
+                )
+                * b2.volt
+            )
+        else:
+            return np.ones((self.exp_hyper.n_e,)) * self.syn_hyper.theta_start
 
     def run(self):
         # ------------------------------------------------------------------------------
