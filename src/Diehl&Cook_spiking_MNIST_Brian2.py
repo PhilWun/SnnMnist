@@ -365,7 +365,7 @@ class Runner:
             spike_rates *= self.net_hyper.input_intensity
 
             self.input_groups["Xe"].rates = spike_rates * b2.Hz
-            #     print 'run number:', j+1, 'of', int(num_examples)
+
             net.run(
                 self.exp_hyper.single_example_time,
                 report="text",
@@ -415,6 +415,7 @@ class Runner:
             )
 
             if np.sum(current_spike_count) < 5:
+                # sample will be shown again with higher intensity
                 self.net_hyper.input_intensity += 1
             else:
                 self.result_monitor[
@@ -452,6 +453,9 @@ class Runner:
                 namespace=variable_namespace,
             )
 
+        self.save_results(input_numbers)
+
+    def save_results(self, input_numbers: List[int]):
         # ------------------------------------------------------------------------------
         # save results
         # ------------------------------------------------------------------------------
