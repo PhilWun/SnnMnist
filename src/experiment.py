@@ -36,7 +36,7 @@ class Runner:
         print("time needed to load training set:", end - start)
 
         start = time.time()
-        self.testing_data = get_labeled_data("testing", b_train=False)
+        self.testing_data = get_labeled_data("testing", training=False)
         end = time.time()
         print("time needed to load test set:", end - start)
 
@@ -62,6 +62,7 @@ class Runner:
                 self.exp_hyper.n_e,
             )
         )
+        """stores the latest spike counts from subgroup Ae"""
 
         self.neuron_groups["e"] = b2.NeuronGroup(
             self.exp_hyper.n_e * len(self.net_hyper.population_names),
@@ -322,7 +323,9 @@ class Runner:
         previous_spike_count: np.ndarray = np.zeros(self.exp_hyper.n_e)
         assignments: np.ndarray = np.zeros(self.exp_hyper.n_e)
         input_numbers: List[int] = [0] * self.exp_hyper.num_examples
+        """the latest target values"""
         output_numbers: np.ndarray = np.zeros((self.exp_hyper.num_examples, 10))
+        """the latest output values"""
 
         self.plotting_handler.plot_input_weights(
             self.exp_hyper.test_mode,
