@@ -44,10 +44,12 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.exp_hyper = ExperimentHyperparameters.get_default(test_mode=True)
-        # self.exp_hyper.num_examples = 10000
-        # self.exp_hyper.update_interval = 100
-        # self.exp_hyper.weight_update_interval = 20
-        # self.exp_hyper.ending = ""
+        self.exp_hyper.num_examples = 1000
+        self.exp_hyper.update_interval = 1000
+        self.exp_hyper.weight_update_interval = 100
+        self.exp_hyper.ending = (
+            "_refrac_factor"  # TODO: rename variable to file_postfix
+        )
 
         self.neuron_hyper = NeuronModelHyperparameters.get_default()
         self.net_hyper = NetworkArchitectureHyperparameters.get_default()
@@ -454,13 +456,13 @@ class Runner:
                     self.net_hyper.save_conns,
                     self.connections,
                     self.exp_hyper.weight_path,
-                    str(iteration),
+                    f"{self.exp_hyper.ending}_{iteration}",
                 )
                 save_theta(
                     self.net_hyper.population_names,
                     self.exp_hyper.weight_path,
                     self.neuron_groups,
-                    str(iteration),
+                    f"{self.exp_hyper.ending}_{iteration}",
                 )
 
             current_spike_count: np.ndarray = (
@@ -525,22 +527,24 @@ class Runner:
                 self.net_hyper.population_names,
                 self.exp_hyper.weight_path,
                 self.neuron_groups,
+                self.exp_hyper.ending,
             )
         if not self.exp_hyper.test_mode:
             save_connections(
                 self.net_hyper.save_conns,
                 self.connections,
                 self.exp_hyper.weight_path,
+                self.exp_hyper.ending,
             )
         else:
             np.save(
                 self.exp_hyper.activity_path
-                / f"resultPopVecs{self.exp_hyper.num_examples}{self.exp_hyper.ending}",
+                / f"resultPopVecs{self.exp_hyper.ending}{self.exp_hyper.update_interval}",
                 self.result_monitor,
             )
             np.save(
                 self.exp_hyper.activity_path
-                / f"inputNumbers{self.exp_hyper.num_examples}{self.exp_hyper.ending}",
+                / f"inputNumbers{self.exp_hyper.ending}{self.exp_hyper.update_interval}",
                 input_numbers,
             )
 

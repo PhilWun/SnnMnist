@@ -26,6 +26,8 @@ class NeuronModelHyperparameters:
     """refractory period duration of an excitatory neuron"""
     refrac_i: b2.Quantity
     """refractory period duration of an inhibitory neuron"""
+    refrac_factor_e: float
+    """factor applied to the refractory period when checking the threshold of an excitatory neuron"""
 
     @staticmethod
     def get_default() -> "NeuronModelHyperparameters":
@@ -39,6 +41,7 @@ class NeuronModelHyperparameters:
             v_start_offset=-40.0 * b2.mV,
             refrac_e=5.0 * b2.ms,
             refrac_i=2.0 * b2.ms,
+            refrac_factor_e=10.0,
         )
 
 
@@ -220,7 +223,9 @@ class ModelEquations:
         else:
             scr_e = "v = v_reset_e; theta += theta_plus_e; timer = 0*ms"
 
-        v_thresh_e_eqs = "(v>(theta - offset + v_thresh_e)) and (timer>refrac_e)"
+        v_thresh_e_eqs = (
+            "(v>(theta - offset + v_thresh_e)) and (timer>(refrac_e * refrac_factor_e))"
+        )
         v_thresh_i_eqs = "v>v_thresh_i"
         v_reset_i_eqs = "v=v_reset_i"
 
@@ -237,9 +242,8 @@ class ModelEquations:
             neuron_eqs_e += "\n  theta      :volt"
         else:
             neuron_eqs_e += "\n  dtheta/dt = -theta / (tc_theta)  : volt"
-        neuron_eqs_e += (
-            "\n  dtimer/dt = 0.1  : second"  # TODO: why 10 times slower clock?
-        )
+
+        neuron_eqs_e += "\n  dtimer/dt = 1.0  : second"
 
         # TODO: replace constants with hyperparameters
         neuron_eqs_i = """
@@ -281,6 +285,7 @@ class ModelEquations:
             "v_thresh_e": neuron_model_hyperparameters.v_thresh_e,
             "v_thresh_i": neuron_model_hyperparameters.v_thresh_i,
             "refrac_e": neuron_model_hyperparameters.refrac_e,
+            "refrac_factor_e": neuron_model_hyperparameters.refrac_factor_e,
             "v_reset_e": neuron_model_hyperparameters.v_rest_e,
             "v_reset_i": neuron_model_hyperparameters.v_reset_i,
             "nu_ee_pre": synapse_model_hyperparameters.nu_ee_pre,

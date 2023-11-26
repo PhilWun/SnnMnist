@@ -14,7 +14,8 @@ from src.experiment import Runner
 
 def main():
     data_path = Path("activity")
-    num_time_steps = 10000
+    file_postfix = "_refrac_factor"
+    num_time_steps = 1000
     """equals the number of examples shown during training / testing"""
     start_evaluation_time = 0
     end_evaluation_time = num_time_steps
@@ -22,8 +23,12 @@ def main():
     time_steps_per_segment = num_time_steps // num_segments
 
     print("load results")
-    result_monitor = np.load(data_path / f"resultPopVecs{num_time_steps}.npy")
-    input_numbers = np.load(data_path / f"inputNumbers{num_time_steps}.npy")
+    result_monitor = np.load(
+        data_path / f"resultPopVecs{file_postfix}{num_time_steps}.npy"
+    )
+    input_numbers = np.load(
+        data_path / f"inputNumbers{file_postfix}{num_time_steps}.npy"
+    )
     print(result_monitor.shape)
 
     runner = Runner()
