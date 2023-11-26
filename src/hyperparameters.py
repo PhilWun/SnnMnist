@@ -9,14 +9,23 @@ import numpy as np
 @dataclass
 class NeuronModelHyperparameters:
     v_rest_e: b2.Quantity
+    """resting potential of an excitatory neuron"""
     v_rest_i: b2.Quantity
+    """resting potential of an inhibitory neuron"""
     v_reset_e: b2.Quantity
+    """potential after an excitatory neuron has spiked"""
     v_reset_i: b2.Quantity
+    """potential after an inhibitory neuron has spiked"""
     v_thresh_e: b2.Quantity
+    """threshold of an excitatory neuron"""
     v_thresh_i: b2.Quantity
+    """threshold of an inhibitory neuron"""
     v_start_offset: b2.Quantity
+    """offset that is applied to the reset potential at the start of the simulation"""
     refrac_e: b2.Quantity
+    """refractory period duration of an excitatory neuron"""
     refrac_i: b2.Quantity
+    """refractory period duration of an inhibitory neuron"""
 
     @staticmethod
     def get_default() -> "NeuronModelHyperparameters":
@@ -35,6 +44,7 @@ class NeuronModelHyperparameters:
 
 @dataclass
 class SynapseModelHyperparameters:
+    # TODO: add docstrings
     tc_pre_ee: b2.Quantity
     tc_post_1_ee: b2.Quantity
     tc_post_2_ee: b2.Quantity
@@ -70,6 +80,7 @@ class SynapseModelHyperparameters:
 
 @dataclass
 class ExperimentHyperparameters:
+    # TODO: add docstrings
     test_mode: bool
     weight_path: Path
     activity_path: Path
@@ -158,6 +169,7 @@ class ExperimentHyperparameters:
 
 @dataclass
 class NetworkArchitectureHyperparameters:
+    # TODO: add docstrings
     weight: Dict[str, float]
     delay: Dict[str, Tuple[b2.Quantity, b2.Quantity]]
     input_population_names: List[str]
@@ -190,6 +202,7 @@ class NetworkArchitectureHyperparameters:
 
 @dataclass
 class ModelEquations:
+    # TODO: add docstrings
     scr_e: str
     v_thresh_e_eqs: str
     v_thresh_i_eqs: str
@@ -211,6 +224,7 @@ class ModelEquations:
         v_thresh_i_eqs = "v>v_thresh_i"
         v_reset_i_eqs = "v=v_reset_i"
 
+        # TODO: replace constants with hyperparameters
         neuron_eqs_e = """
            dv/dt = ((v_rest_e - v) + (I_synE+I_synI) / nS) / (100*ms)  : volt (unless refractory)
            I_synE = ge * nS *          -v                              : amp
@@ -223,8 +237,11 @@ class ModelEquations:
             neuron_eqs_e += "\n  theta      :volt"
         else:
             neuron_eqs_e += "\n  dtheta/dt = -theta / (tc_theta)  : volt"
-        neuron_eqs_e += "\n  dtimer/dt = 0.1  : second"
+        neuron_eqs_e += (
+            "\n  dtimer/dt = 0.1  : second"  # TODO: why 10 times slower clock?
+        )
 
+        # TODO: replace constants with hyperparameters
         neuron_eqs_i = """
             dv/dt = ((v_rest_i - v) + (I_synE+I_synI) / nS) / (10*ms)  : volt (unless refractory)
             I_synE = ge * nS *         -v                              : amp

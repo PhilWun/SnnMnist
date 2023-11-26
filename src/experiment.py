@@ -44,9 +44,18 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.exp_hyper = ExperimentHyperparameters.get_default(test_mode=True)
+        # self.exp_hyper.num_examples = 10000
+        # self.exp_hyper.update_interval = 100
+        # self.exp_hyper.weight_update_interval = 20
+        # self.exp_hyper.ending = ""
 
         self.neuron_hyper = NeuronModelHyperparameters.get_default()
         self.net_hyper = NetworkArchitectureHyperparameters.get_default()
+        # self.net_hyper.delay = {
+        #     "ee_input": (0 * b2.ms, 0 * b2.ms),
+        #     "ei_input": (0 * b2.ms, 0 * b2.ms),
+        # }
+
         self.syn_hyper = SynapseModelHyperparameters.get_default()
         self.model_equations = ModelEquations.get_default(self.exp_hyper.test_mode)
 
@@ -87,6 +96,9 @@ class Runner:
         self.plotting_handler = PlottingHandler()
 
     def normalize_weights(self):
+        """
+        Normalize the weights from input to Ae so that the weights to each neuron in Ae have a specific sum.
+        """
         for connName in self.connections:
             if not (connName[1] == "e" and connName[3] == "e"):
                 continue
@@ -112,11 +124,19 @@ class Runner:
     def get_recognized_number_ranking(
         assignments: np.ndarray, spike_rates: np.ndarray
     ) -> np.ndarray:
+        """
+        Calculate the prediction which classes are most-likely.
+
+        :param assignments: class assignments of the excitatory neurons, shape: (neuron count)
+        :param spike_rates: spike counts of the excitatory neurons for the current input, shape: (neuron count)
+        :return: ranking of the most likely classes, most-likely first, shape: (10)
+        """
         summed_rates = [0] * 10
         num_assignments = [0] * 10
 
         for i in range(10):
             num_assignments[i] = len(np.where(assignments == i)[0])
+
             if num_assignments[i] > 0:
                 summed_rates[i] = (
                     np.sum(spike_rates[assignments == i]) / num_assignments[i]
@@ -124,7 +144,16 @@ class Runner:
 
         return np.argsort(summed_rates)[::-1]
 
-    def get_new_assignments(self, result_monitor: np.ndarray, input_numbers: List[int]):
+    def get_new_assignments(
+        self, result_monitor: np.ndarray, input_numbers: List[int]
+    ) -> np.ndarray:
+        """
+        Assigns every neuron the class for which it spiked the most.
+
+        :param result_monitor: spike count for each neuron, shape: (update interval, neuron count)
+        :param input_numbers: target classes, shape: (update interval)
+        :return: class assignments for each neuron
+        """
         assignments: np.ndarray = np.zeros(self.exp_hyper.n_e)
         input_nums: np.ndarray = np.asarray(input_numbers)
         maximum_rate: List[float] = [0] * self.exp_hyper.n_e
@@ -142,10 +171,13 @@ class Runner:
 
         return assignments
 
-    def create_network_and_recurrent_connections(self):
-        # ------------------------------------------------------------------------------
-        # create network population and recurrent connections
-        # ------------------------------------------------------------------------------
+    def create_network_and_recurrent_connections(self) -> None:
+        """
+        Create the neuron subgroups, set the start state, create the connections between excitatory and inhibitory
+        subgroups, add spike and rate monitors.
+
+        :return: None
+        """
 
         for subgroup_n, name in enumerate(self.net_hyper.population_names):
             print("create neuron group", name)
@@ -171,6 +203,7 @@ class Runner:
             for conn_type in self.net_hyper.recurrent_conn_names:
                 conn_name = name + conn_type[0] + name + conn_type[1]
                 weight_matrix = self.generate_or_load_weights(conn_name)
+                # TODO: move to model equations
                 model = "w : 1"
                 pre = f"g{conn_type[0]}_post += w"
                 post = ""
@@ -213,10 +246,12 @@ class Runner:
                     self.neuron_groups[name + "i"]
                 )
 
-    def create_input_population_and_connection(self):
-        # ------------------------------------------------------------------------------
-        # create input population and connections from input populations
-        # ------------------------------------------------------------------------------
+    def create_input_population_and_connection(self) -> None:
+        """
+        Create input groups, add rate monitors, add connections to neuron groups
+
+        :return: None
+        """
 
         for i, name in enumerate(self.net_hyper.input_population_names):
             self.input_groups[name + "e"] = b2.PoissonGroup(
@@ -232,6 +267,7 @@ class Runner:
             for conn_type in self.net_hyper.input_conn_names:
                 conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
                 weight_matrix = self.generate_or_load_weights(conn_name)
+                # TODO: move to model equations
                 model = "w : 1"
                 pre = f"g{conn_type[0]}_post += w"
                 post = ""
@@ -260,6 +296,13 @@ class Runner:
                 ]
 
     def generate_or_load_weights(self, conn_name: str) -> np.ndarray:
+        """
+        Generate initial weights in training mode. Load saved weights in test mode and generate the rest.
+
+        :param conn_name: name of the connection for which the weights should be generated or loaded
+        :return: generated of loaded weights, shape: (presynaptic neuron count, postsynaptic neuron count)
+        """
+
         load_from_file = (
             conn_name in self.net_hyper.save_conns and self.exp_hyper.test_mode
         )
@@ -289,6 +332,14 @@ class Runner:
                 raise ValueError(f"unknown connection name {conn_name}")
 
     def generate_or_load_theta(self, sub_group_name: str) -> np.ndarray:
+        """
+        Generate initial values for the dynamic threshold offset theta in training mode. Load them from file in test
+        mode.
+
+        :param sub_group_name: name of the subgroup of neurons for which the theta values should be generated or loaded
+        :return: theta values, shape: (neuron count)
+        """
+
         load_from_file = self.exp_hyper.test_mode
 
         if load_from_file:
@@ -302,10 +353,12 @@ class Runner:
         else:
             return np.ones((self.exp_hyper.n_e,)) * self.syn_hyper.theta_start
 
-    def run(self):
-        # ------------------------------------------------------------------------------
-        # run the simulation and set inputs
-        # ------------------------------------------------------------------------------
+    def run(self) -> None:
+        """
+        Run the experiment, train / test the model.
+
+        :return: None
+        """
 
         net = b2.Network()
 
@@ -458,10 +511,14 @@ class Runner:
 
         self.save_results(input_numbers)
 
-    def save_results(self, input_numbers: List[int]):
-        # ------------------------------------------------------------------------------
-        # save results
-        # ------------------------------------------------------------------------------
+    def save_results(self, input_numbers: List[int]) -> None:
+        """
+        In training mode save the trained weights. Display the results in any case.
+
+        :param input_numbers: target classes
+        :return: None
+        """
+
         print("save results")
         if not self.exp_hyper.test_mode:
             save_theta(
@@ -478,12 +535,12 @@ class Runner:
         else:
             np.save(
                 self.exp_hyper.activity_path
-                / f"resultPopVecs{self.exp_hyper.num_examples}",
+                / f"resultPopVecs{self.exp_hyper.num_examples}{self.exp_hyper.ending}",
                 self.result_monitor,
             )
             np.save(
                 self.exp_hyper.activity_path
-                / f"inputNumbers{self.exp_hyper.num_examples}",
+                / f"inputNumbers{self.exp_hyper.num_examples}{self.exp_hyper.ending}",
                 input_numbers,
             )
 
