@@ -72,9 +72,9 @@ def get_labeled_data(pickle_file_name: str, training=True) -> LabeledData:
 
 
 def get_matrix_from_file(
-    file_name: Path, ending: str, n_input: int, n_e: int, n_i: int
+    file_name: Path, file_postfix: str, n_input: int, n_e: int, n_i: int
 ) -> np.ndarray:
-    offset = len(ending) + 4
+    offset = len(file_postfix) + 4
 
     if file_name.name[-4 - offset] == "X":
         n_src = n_input
@@ -103,26 +103,26 @@ def save_connections(
     save_conns: List[str],
     connections: Dict[str, b2.Synapses],
     weight_path: Path,
-    ending="",
+    file_postfix="",
 ) -> None:
     print("save connections")
 
     for connName in save_conns:
         conn = connections[connName]
         conn_list_sparse = np.stack([conn.i, conn.j, conn.w], axis=1)
-        np.save(weight_path / f"{connName}{ending}", conn_list_sparse)
+        np.save(weight_path / f"{connName}{file_postfix}", conn_list_sparse)
 
 
 def save_theta(
     population_names: List[str],
     weight_path: Path,
     neuron_groups: Dict[str, b2.NeuronGroup],
-    ending="",
+    file_postfix="",
 ) -> None:
     print("save theta")
 
     for pop_name in population_names:
         np.save(
-            weight_path / f"theta_{pop_name}{ending}",
+            weight_path / f"theta_{pop_name}{file_postfix}",
             neuron_groups[pop_name + "e"].theta,
         )

@@ -47,9 +47,7 @@ class Runner:
         self.exp_hyper.num_examples = 1000
         self.exp_hyper.update_interval = 1000
         self.exp_hyper.weight_update_interval = 100
-        self.exp_hyper.ending = (
-            "_refrac_factor"  # TODO: rename variable to file_postfix
-        )
+        self.exp_hyper.file_postfix = "_refrac_factor"
 
         self.neuron_hyper = NeuronModelHyperparameters.get_default()
         self.net_hyper = NetworkArchitectureHyperparameters.get_default()
@@ -312,8 +310,8 @@ class Runner:
         if load_from_file:
             return get_matrix_from_file(
                 self.exp_hyper.weight_path
-                / (conn_name + self.exp_hyper.ending + ".npy"),
-                self.exp_hyper.ending,
+                / (conn_name + self.exp_hyper.file_postfix + ".npy"),
+                self.exp_hyper.file_postfix,
                 self.exp_hyper.n_input,
                 self.exp_hyper.n_e,
                 self.exp_hyper.n_i,
@@ -348,7 +346,7 @@ class Runner:
             return (
                 np.load(
                     self.exp_hyper.weight_path
-                    / f"theta_{sub_group_name}{self.exp_hyper.ending}.npy"
+                    / f"theta_{sub_group_name}{self.exp_hyper.file_postfix}.npy"
                 )
                 * b2.volt
             )
@@ -456,13 +454,13 @@ class Runner:
                     self.net_hyper.save_conns,
                     self.connections,
                     self.exp_hyper.weight_path,
-                    f"{self.exp_hyper.ending}_{iteration}",
+                    f"{self.exp_hyper.file_postfix}_{iteration}",
                 )
                 save_theta(
                     self.net_hyper.population_names,
                     self.exp_hyper.weight_path,
                     self.neuron_groups,
-                    f"{self.exp_hyper.ending}_{iteration}",
+                    f"{self.exp_hyper.file_postfix}_{iteration}",
                 )
 
             current_spike_count: np.ndarray = (
@@ -527,24 +525,24 @@ class Runner:
                 self.net_hyper.population_names,
                 self.exp_hyper.weight_path,
                 self.neuron_groups,
-                self.exp_hyper.ending,
+                self.exp_hyper.file_postfix,
             )
         if not self.exp_hyper.test_mode:
             save_connections(
                 self.net_hyper.save_conns,
                 self.connections,
                 self.exp_hyper.weight_path,
-                self.exp_hyper.ending,
+                self.exp_hyper.file_postfix,
             )
         else:
             np.save(
                 self.exp_hyper.activity_path
-                / f"resultPopVecs{self.exp_hyper.ending}{self.exp_hyper.update_interval}",
+                / f"resultPopVecs{self.exp_hyper.file_postfix}{self.exp_hyper.update_interval}",
                 self.result_monitor,
             )
             np.save(
                 self.exp_hyper.activity_path
-                / f"inputNumbers{self.exp_hyper.ending}{self.exp_hyper.update_interval}",
+                / f"inputNumbers{self.exp_hyper.file_postfix}{self.exp_hyper.update_interval}",
                 input_numbers,
             )
 

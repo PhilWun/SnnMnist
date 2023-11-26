@@ -93,7 +93,7 @@ class ExperimentHyperparameters:
     record_spikes: bool
     ee_stdp_on: bool
     update_interval: int
-    ending: str
+    file_postfix: str
     n_input: int
     n_e: int
     n_i: int
@@ -128,7 +128,7 @@ class ExperimentHyperparameters:
 
             ee_stdp_on = True
 
-        ending = ""
+        file_postfix = ""
         n_input = 784
         n_e = 400
         n_i = n_e
@@ -158,7 +158,7 @@ class ExperimentHyperparameters:
             record_spikes=record_spikes,
             ee_stdp_on=ee_stdp_on,
             update_interval=update_interval,
-            ending=ending,
+            file_postfix=file_postfix,
             n_input=n_input,
             n_e=n_e,
             n_i=n_i,
