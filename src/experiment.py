@@ -44,10 +44,10 @@ class Runner:
         # set parameters and equations
         # ------------------------------------------------------------------------------
         self.exp_hyper = ExperimentHyperparameters.get_default(test_mode=True)
-        self.exp_hyper.num_examples = 1000
-        self.exp_hyper.update_interval = 1000
-        self.exp_hyper.weight_update_interval = 100
-        self.exp_hyper.file_postfix = "_refrac_factor"
+        # self.exp_hyper.num_examples = 10000
+        # self.exp_hyper.update_interval = 100
+        # self.exp_hyper.weight_update_interval = 100
+        # self.exp_hyper.file_postfix = "_refrac_factor"
 
         self.neuron_hyper = NeuronModelHyperparameters.get_default()
         self.net_hyper = NetworkArchitectureHyperparameters.get_default()

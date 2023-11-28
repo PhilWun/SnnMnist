@@ -22,6 +22,22 @@ class NeuronModelHyperparameters:
     """threshold of an inhibitory neuron"""
     v_start_offset: b2.Quantity
     """offset that is applied to the reset potential at the start of the simulation"""
+    v_equi_e_e: b2.Quantity
+    """equilibrium potential of excitatory synapses of excitatory neurons"""
+    v_equi_i_e: b2.Quantity
+    """equilibrium potential of inhibitory synapses of excitatory neurons"""
+    v_equi_e_i: b2.Quantity
+    """equilibrium potential of excitatory synapses of inhibitory neurons"""
+    v_equi_i_i: b2.Quantity
+    """equilibrium potential of inhibitory synapses of inhibitory neurons"""
+    tc_v_e: b2.Quantity
+    """time constant for the membrane potential of excitatory neurons"""
+    tc_v_i: b2.Quantity
+    """time constant for the membrane potential of inhibitory neurons"""
+    tc_ge: b2.Quantity
+    """time constant for excitatory conductance"""
+    tc_gi: b2.Quantity
+    """time constant for inhibitory conductance"""
     refrac_e: b2.Quantity
     """refractory period duration of an excitatory neuron"""
     refrac_i: b2.Quantity
@@ -40,6 +56,14 @@ class NeuronModelHyperparameters:
             v_thresh_e=-52.0 * b2.mV,
             v_thresh_i=-40.0 * b2.mV,
             v_start_offset=-40.0 * b2.mV,
+            v_equi_e_e=0.0 * b2.mV,
+            v_equi_i_e=-100.0 * b2.mV,
+            v_equi_e_i=0.0 * b2.mV,
+            v_equi_i_i=-85.0 * b2.mV,
+            tc_v_e=100.0 * b2.ms,
+            tc_v_i=10.0 * b2.ms,
+            tc_ge=1.0 * b2.ms,
+            tc_gi=2.0 * b2.ms,
             refrac_e=5.0 * b2.ms,
             refrac_i=2.0 * b2.ms,
             refrac_factor_e=10.0,
@@ -266,13 +290,12 @@ class ModelEquations:
         v_thresh_i_eqs = "v>v_thresh_i"
         v_reset_i_eqs = "v=v_reset_i"
 
-        # TODO: replace constants with hyperparameters (E_exc, E_inh, ...)
         neuron_eqs_e = """
-           dv/dt = ((v_rest_e - v) + (I_synE+I_synI) / nS) / (100*ms)  : volt (unless refractory)
-           I_synE = ge * nS *          -v                              : amp
-           I_synI = gi * nS * (-100.*mV-v)                             : amp
-           dge/dt = -ge/(1.0*ms)                                       : 1
-           dgi/dt = -gi/(2.0*ms)                                       : 1
+           dv/dt = ((v_rest_e - v) + (I_synE+I_synI) / nS) / tc_v_e    : volt (unless refractory)
+           I_synE = ge * nS * (v_equi_e_e - v)                         : amp
+           I_synI = gi * nS * (v_equi_i_e - v)                         : amp
+           dge/dt = -ge/tc_ge                                          : 1
+           dgi/dt = -gi/tc_gi                                          : 1
            """
 
         if test_mode:
@@ -282,13 +305,12 @@ class ModelEquations:
 
         neuron_eqs_e += "\n  dtimer/dt = 1.0  : second"
 
-        # TODO: replace constants with hyperparameters
         neuron_eqs_i = """
-            dv/dt = ((v_rest_i - v) + (I_synE+I_synI) / nS) / (10*ms)  : volt (unless refractory)
-            I_synE = ge * nS *         -v                              : amp
-            I_synI = gi * nS * (-85.*mV-v)                             : amp
-            dge/dt = -ge/(1.0*ms)                                      : 1
-            dgi/dt = -gi/(2.0*ms)                                      : 1
+            dv/dt = ((v_rest_i - v) + (I_synE+I_synI) / nS) / tc_v_i   : volt (unless refractory)
+            I_synE = ge * nS * (v_equi_e_i - v)                        : amp
+            I_synI = gi * nS * (v_equi_i_i - v)                        : amp
+            dge/dt = -ge/tc_ge                                         : 1
+            dgi/dt = -gi/tc_gi                                         : 1
             """
         eqs_stdp_ee = """
             post2before                            : 1
@@ -325,6 +347,14 @@ class ModelEquations:
             "refrac_factor_e": neuron_model_hyperparameters.refrac_factor_e,
             "v_reset_e": neuron_model_hyperparameters.v_rest_e,
             "v_reset_i": neuron_model_hyperparameters.v_reset_i,
+            "v_equi_e_e": neuron_model_hyperparameters.v_equi_e_e,
+            "v_equi_i_e": neuron_model_hyperparameters.v_equi_i_e,
+            "v_equi_e_i": neuron_model_hyperparameters.v_equi_e_i,
+            "v_equi_i_i": neuron_model_hyperparameters.v_equi_i_i,
+            "tc_v_e": neuron_model_hyperparameters.tc_v_e,
+            "tc_v_i": neuron_model_hyperparameters.tc_v_i,
+            "tc_ge": neuron_model_hyperparameters.tc_ge,
+            "tc_gi": neuron_model_hyperparameters.tc_gi,
             "nu_ee_pre": synapse_model_hyperparameters.nu_ee_pre,
             "tc_post_1_ee": synapse_model_hyperparameters.tc_post_1_ee,
             "tc_post_2_ee": synapse_model_hyperparameters.tc_post_2_ee,
