@@ -26,6 +26,7 @@ class NeuronModelHyperparameters:
     """refractory period duration of an excitatory neuron"""
     refrac_i: b2.Quantity
     """refractory period duration of an inhibitory neuron"""
+    # TODO: why is this only used in the equation and not in the neuron group object?
     refrac_factor_e: float
     """factor applied to the refractory period when checking the threshold of an excitatory neuron"""
 
@@ -47,20 +48,26 @@ class NeuronModelHyperparameters:
 
 @dataclass
 class SynapseModelHyperparameters:
-    # TODO: add docstrings
     tc_pre_ee: b2.Quantity
+    """time constant of the presynaptic trace of the learning rule"""
     tc_post_1_ee: b2.Quantity
+    """time constant of the first postsynaptic trace of the learning rule"""
     tc_post_2_ee: b2.Quantity
+    """time constant of the second postsynaptic trace of the learning rule"""
     nu_ee_pre: float
+    """learning rate for presynaptic spikes"""
     nu_ee_post: float
+    """learning rate for postsynaptic spikes"""
     wmax_ee: float
-    exp_ee_pre: float
-    exp_ee_post: float
-    STDP_offset: float
+    """max weight"""
     theta_start: b2.Quantity
+    """start value for the dynamic threshold theta"""
     tc_theta: b2.Quantity
+    """time constant of theta"""
     theta_plus_e: b2.Quantity
+    """value added to theta when neuron is reset"""
     offset: b2.Quantity
+    """value subtracted from threshold"""
 
     @staticmethod
     def get_default() -> "SynapseModelHyperparameters":
@@ -71,9 +78,6 @@ class SynapseModelHyperparameters:
             nu_ee_pre=0.0001,  # learning rate
             nu_ee_post=0.01,  # learning rate,
             wmax_ee=1.0,
-            exp_ee_pre=0.2,
-            exp_ee_post=0.2,
-            STDP_offset=0.4,
             theta_start=20 * b2.mV,
             tc_theta=1e7 * b2.ms,
             theta_plus_e=0.05 * b2.mV,
@@ -83,26 +87,42 @@ class SynapseModelHyperparameters:
 
 @dataclass
 class ExperimentHyperparameters:
-    # TODO: add docstrings
     test_mode: bool
+    """determines test or training mode"""
     weight_path: Path
+    """path to the folder where the weights should be saved in training mode"""
     activity_path: Path
+    """path to the folder where the predictions should be saved in test mode"""
     num_examples: int
+    """Number of examples that should be shown to the network. Values larger than the dataset can be used to train for multiple epochs."""
     use_testing_set: bool
+    """determines if test or training data will be used"""
     do_plot_performance: bool
+    """determines if the performance plot will be shown"""
     record_spikes: bool
+    """determines if every single spike should be recorded"""
     ee_stdp_on: bool
-    update_interval: int
+    """determines whether the connection between input and excitatory neurons should be trained with STDP"""
     file_postfix: str
+    """the postfix for the files that will be saved"""
     n_input: int
+    """number of input values per sample"""
     n_e: int
+    """number of excitatory neurons"""
     n_i: int
+    """number of inhibitory neurons"""
     single_example_time: b2.Quantity
+    """duration an input will be shown to the network"""
     resting_time: b2.Quantity
+    """duration between two input examples where no input will be shown to the network"""
     runtime: b2.Quantity
+    """estimation of the total runtime"""
     update_interval: int
+    """number of iterations after which the assignments and performance plot get updated"""
     weight_update_interval: int
+    """number of iterations after which the weights plot gets updated"""
     save_connections_interval: int
+    """number of iterations after which the network parameters will be saved"""
 
     @staticmethod
     def get_default(test_mode: bool) -> "ExperimentHyperparameters":
@@ -172,17 +192,26 @@ class ExperimentHyperparameters:
 
 @dataclass
 class NetworkArchitectureHyperparameters:
-    # TODO: add docstrings
     weight: Dict[str, float]
+    """target weight sums for normalization"""
     delay: Dict[str, Tuple[b2.Quantity, b2.Quantity]]
+    """delay ranges for input connections"""
     input_population_names: List[str]
+    """names of the input neuron populations"""
     population_names: List[str]
+    """names of the hidden neuron populations"""
     input_connection_names: List[str]
+    """names of the connections between input neuron and hidden neuron populations"""
     save_conns: List[str]
+    """names of the connections that should be saved to files"""
     input_conn_names: List[str]
+    """input connection types"""
     recurrent_conn_names: List[str]
+    """recurrent connection types"""
     input_intensity: float
+    """multiplicative factor for the input values"""
     start_input_intensity: float
+    """start value of the input intensity"""
 
     @staticmethod
     def get_default() -> "NetworkArchitectureHyperparameters":
@@ -205,16 +234,24 @@ class NetworkArchitectureHyperparameters:
 
 @dataclass
 class ModelEquations:
-    # TODO: add docstrings
     scr_e: str
+    """equation for resetting the neuron"""
     v_thresh_e_eqs: str
+    """equation for checking the threshold of excitatory neurons"""
     v_thresh_i_eqs: str
+    """equation for checking the threshold of inhibitory neurons"""
     v_reset_i_eqs: str
+    """equation for resetting the inhibitory neuron"""
     neuron_eqs_e: str
+    """equation defining the membrane potential changes for excitatory neurons"""
     neuron_eqs_i: str
+    """equation defining the membrane potential changes for inhibitory neurons"""
     eqs_stdp_ee: str
+    """equation defining the exponential decay of the traces of the learning rule"""
     eqs_stdp_pre_ee: str
+    """equation defining the learning rule for presynaptic spikes"""
     eqs_stdp_post_ee: str
+    """equation defining the learning rule for postsynaptic spikes"""
 
     @staticmethod
     def get_default(test_mode: bool) -> "ModelEquations":
@@ -229,7 +266,7 @@ class ModelEquations:
         v_thresh_i_eqs = "v>v_thresh_i"
         v_reset_i_eqs = "v=v_reset_i"
 
-        # TODO: replace constants with hyperparameters
+        # TODO: replace constants with hyperparameters (E_exc, E_inh, ...)
         neuron_eqs_e = """
            dv/dt = ((v_rest_e - v) + (I_synE+I_synI) / nS) / (100*ms)  : volt (unless refractory)
            I_synE = ge * nS *          -v                              : amp
