@@ -270,6 +270,14 @@ class ModelEquations:
     """equation defining the membrane potential changes for excitatory neurons"""
     neuron_eqs_i: str
     """equation defining the membrane potential changes for inhibitory neurons"""
+    syn_eqs: str
+    """equation setting up the synapses"""
+    syn_eqs_pre_e: str
+    """equation defining the behavior of an excitatory synapse during a presynaptic spike"""
+    syn_eqs_pre_i: str
+    """equation defining the behavior of an inhibitory synapse during a presynaptic spike"""
+    syn_eqs_post: str
+    """equation defining the behavior of a synapse during a postsynaptic spike"""
     eqs_stdp_ee: str
     """equation defining the exponential decay of the traces of the learning rule"""
     eqs_stdp_pre_ee: str
@@ -312,6 +320,12 @@ class ModelEquations:
             dge/dt = -ge/tc_ge                                         : 1
             dgi/dt = -gi/tc_gi                                         : 1
             """
+
+        syn_eqs = "w : 1"
+        syn_eqs_pre_e = "ge_post += w"  # _post means it uses this variable from the postsynaptic neuron
+        syn_eqs_pre_i = "gi_post += w"  # _post means it uses this variable from the postsynaptic neuron
+        syn_eqs_post = ""
+
         eqs_stdp_ee = """
             post2before                            : 1
             dpre/dt    = -pre/(tc_pre_ee)          : 1 (event-driven)
@@ -328,6 +342,10 @@ class ModelEquations:
             v_reset_i_eqs=v_reset_i_eqs,
             neuron_eqs_e=neuron_eqs_e,
             neuron_eqs_i=neuron_eqs_i,
+            syn_eqs=syn_eqs,
+            syn_eqs_pre_e=syn_eqs_pre_e,
+            syn_eqs_pre_i=syn_eqs_pre_i,
+            syn_eqs_post=syn_eqs_post,
             eqs_stdp_ee=eqs_stdp_ee,
             eqs_stdp_pre_ee=eqs_stdp_pre_ee,
             eqs_stdp_post_ee=eqs_stdp_post_ee,

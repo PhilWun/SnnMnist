@@ -203,24 +203,30 @@ class Runner:
             for conn_type in self.net_hyper.recurrent_conn_names:
                 conn_name = name + conn_type[0] + name + conn_type[1]
                 weight_matrix = self.generate_or_load_weights(conn_name)
-                # TODO: move to model equations
-                model = "w : 1"
-                pre = f"g{conn_type[0]}_post += w"
-                post = ""
+
+                model = self.model_equations.syn_eqs
+                on_post = self.model_equations.syn_eqs_post
+
+                if conn_type[0] == "e":
+                    on_pre = self.model_equations.syn_eqs_pre_e
+                elif conn_type[0] == "i":
+                    on_pre = self.model_equations.syn_eqs_pre_i
+                else:
+                    raise ValueError
 
                 if self.exp_hyper.ee_stdp_on:
                     # not true: STDP is not used for the recurrent connections
                     if "ee" in self.net_hyper.recurrent_conn_names:
                         model += self.model_equations.eqs_stdp_ee
-                        pre += "; " + self.model_equations.eqs_stdp_pre_ee
-                        post = self.model_equations.eqs_stdp_post_ee
+                        on_pre += "; " + self.model_equations.eqs_stdp_pre_ee
+                        on_post = self.model_equations.eqs_stdp_post_ee
 
                 self.connections[conn_name] = b2.Synapses(
                     self.neuron_groups[conn_name[0:2]],
                     self.neuron_groups[conn_name[2:4]],
                     model=model,
-                    on_pre=pre,
-                    on_post=post,
+                    on_pre=on_pre,
+                    on_post=on_post,
                 )
                 self.connections[conn_name].connect(True)  # all-to-all connection
                 self.connections[conn_name].w = weight_matrix[
