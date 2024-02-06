@@ -25,6 +25,7 @@ from src.hyperparameters import (
 from src.plotting import PlottingHandler
 
 
+# noinspection PyInterpreter
 class Runner:
     def __init__(self):
         # ------------------------------------------------------------------------------
@@ -43,10 +44,10 @@ class Runner:
         # ------------------------------------------------------------------------------
         # set parameters and equations
         # ------------------------------------------------------------------------------
-        self.exp_hyper = ExperimentHyperparameters.get_default(test_mode=True)
-        # self.exp_hyper.num_examples = 10000
-        # self.exp_hyper.update_interval = 100
-        # self.exp_hyper.weight_update_interval = 100
+        self.exp_hyper = ExperimentHyperparameters.get_default(test_mode=False)
+        self.exp_hyper.num_examples = 10000
+        self.exp_hyper.update_interval = 100
+        self.exp_hyper.weight_update_interval = 100
         # self.exp_hyper.file_postfix = "_refrac_factor"
 
         self.neuron_hyper = NeuronModelHyperparameters.get_default()
@@ -273,23 +274,29 @@ class Runner:
             for conn_type in self.net_hyper.input_conn_names:
                 conn_name = name[0] + conn_type[0] + name[1] + conn_type[1]
                 weight_matrix = self.generate_or_load_weights(conn_name)
-                # TODO: move to model equations
-                model = "w : 1"
-                pre = f"g{conn_type[0]}_post += w"
-                post = ""
+
+                model = self.model_equations.syn_eqs
+                on_post = self.model_equations.syn_eqs_post
+
+                if conn_type[0] == "e":
+                    on_pre = self.model_equations.syn_eqs_pre_e
+                elif conn_type[0] == "i":
+                    on_pre = self.model_equations.syn_eqs_pre_i
+                else:
+                    raise ValueError
 
                 if self.exp_hyper.ee_stdp_on:
                     print("create STDP for connection", name[0] + "e" + name[1] + "e")
                     model += self.model_equations.eqs_stdp_ee
-                    pre += "; " + self.model_equations.eqs_stdp_pre_ee
-                    post = self.model_equations.eqs_stdp_post_ee
+                    on_pre += "; " + self.model_equations.eqs_stdp_pre_ee
+                    on_post = self.model_equations.eqs_stdp_post_ee
 
                 self.connections[conn_name] = b2.Synapses(
                     self.input_groups[conn_name[0:2]],
                     self.neuron_groups[conn_name[2:4]],
                     model=model,
-                    on_pre=pre,
-                    on_post=post,
+                    on_pre=on_pre,
+                    on_post=on_post,
                 )
                 min_delay = self.net_hyper.delay[conn_type][0]
                 max_delay = self.net_hyper.delay[conn_type][1]

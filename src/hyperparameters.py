@@ -42,9 +42,8 @@ class NeuronModelHyperparameters:
     """refractory period duration of an excitatory neuron"""
     refrac_i: b2.Quantity
     """refractory period duration of an inhibitory neuron"""
-    # TODO: why is this only used in the equation and not in the neuron group object?
     refrac_factor_e: float
-    """factor applied to the refractory period when checking the threshold of an excitatory neuron"""
+    """factor applied to the refractory period of an excitatory neuron when checking the threshold"""
 
     @staticmethod
     def get_default() -> "NeuronModelHyperparameters":
@@ -84,6 +83,7 @@ class SynapseModelHyperparameters:
     """learning rate for postsynaptic spikes"""
     wmax_ee: float
     """max weight"""
+    # TODO: move the following hyperparameters to the neuron model hyperparameters
     theta_start: b2.Quantity
     """start value for the dynamic threshold theta"""
     tc_theta: b2.Quantity
