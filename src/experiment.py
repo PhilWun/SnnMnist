@@ -364,7 +364,7 @@ class Runner:
                 * b2.volt
             )
         else:
-            return np.ones((self.exp_hyper.n_e,)) * self.syn_hyper.theta_start
+            return np.ones((self.exp_hyper.n_e,)) * self.neuron_hyper.theta_start
 
     def run(self) -> None:
         """

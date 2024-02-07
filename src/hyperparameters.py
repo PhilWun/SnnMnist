@@ -44,6 +44,14 @@ class NeuronModelHyperparameters:
     """refractory period duration of an inhibitory neuron"""
     refrac_factor_e: float
     """factor applied to the refractory period of an excitatory neuron when checking the threshold"""
+    theta_start: b2.Quantity
+    """start value for the dynamic threshold theta"""
+    tc_theta: b2.Quantity
+    """time constant of theta"""
+    theta_plus_e: b2.Quantity
+    """value added to theta when neuron is reset"""
+    offset: b2.Quantity
+    """value subtracted from threshold"""
 
     @staticmethod
     def get_default() -> "NeuronModelHyperparameters":
@@ -66,6 +74,10 @@ class NeuronModelHyperparameters:
             refrac_e=5.0 * b2.ms,
             refrac_i=2.0 * b2.ms,
             refrac_factor_e=10.0,
+            theta_start=20 * b2.mV,
+            tc_theta=1e7 * b2.ms,
+            theta_plus_e=0.05 * b2.mV,
+            offset=20.0 * b2.mV,
         )
 
 
@@ -83,15 +95,6 @@ class SynapseModelHyperparameters:
     """learning rate for postsynaptic spikes"""
     wmax_ee: float
     """max weight"""
-    # TODO: move the following hyperparameters to the neuron model hyperparameters
-    theta_start: b2.Quantity
-    """start value for the dynamic threshold theta"""
-    tc_theta: b2.Quantity
-    """time constant of theta"""
-    theta_plus_e: b2.Quantity
-    """value added to theta when neuron is reset"""
-    offset: b2.Quantity
-    """value subtracted from threshold"""
 
     @staticmethod
     def get_default() -> "SynapseModelHyperparameters":
@@ -102,10 +105,6 @@ class SynapseModelHyperparameters:
             nu_ee_pre=0.0001,  # learning rate
             nu_ee_post=0.01,  # learning rate,
             wmax_ee=1.0,
-            theta_start=20 * b2.mV,
-            tc_theta=1e7 * b2.ms,
-            theta_plus_e=0.05 * b2.mV,
-            offset=20.0 * b2.mV,
         )
 
 
@@ -373,13 +372,13 @@ class ModelEquations:
             "tc_v_i": neuron_model_hyperparameters.tc_v_i,
             "tc_ge": neuron_model_hyperparameters.tc_ge,
             "tc_gi": neuron_model_hyperparameters.tc_gi,
+            "offset": neuron_model_hyperparameters.offset,
+            "tc_theta": neuron_model_hyperparameters.tc_theta,
+            "theta_plus_e": neuron_model_hyperparameters.theta_plus_e,
             "nu_ee_pre": synapse_model_hyperparameters.nu_ee_pre,
             "tc_post_1_ee": synapse_model_hyperparameters.tc_post_1_ee,
             "tc_post_2_ee": synapse_model_hyperparameters.tc_post_2_ee,
             "tc_pre_ee": synapse_model_hyperparameters.tc_pre_ee,
             "wmax_ee": synapse_model_hyperparameters.wmax_ee,
             "nu_ee_post": synapse_model_hyperparameters.nu_ee_post,
-            "offset": synapse_model_hyperparameters.offset,
-            "tc_theta": synapse_model_hyperparameters.tc_theta,
-            "theta_plus_e": synapse_model_hyperparameters.theta_plus_e,
         }
