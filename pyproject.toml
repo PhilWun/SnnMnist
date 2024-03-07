@@ -10,6 +10,7 @@ python = "^3.11"
 brian2 = "^2.5.4"
 brian2tools = "^0.3"
 black = "^23.11.0"
+mlflow = "^2.11.1"
 
 
 [build-system]
