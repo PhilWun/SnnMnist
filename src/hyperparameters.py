@@ -331,7 +331,7 @@ class ModelEquations:
             dpost1/dt  = -post1/(tc_post_1_ee)     : 1 (event-driven)
             dpost2/dt  = -post2/(tc_post_2_ee)     : 1 (event-driven)
             """
-        eqs_stdp_pre_ee = "pre = 1.; w = clip(w + nu_ee_pre * post1, 0, wmax_ee)"
+        eqs_stdp_pre_ee = "pre = 1.; w = clip(w - nu_ee_pre * post1, 0, wmax_ee)"
         eqs_stdp_post_ee = "post2before = post2; w = clip(w + nu_ee_post * pre * post2before, 0, wmax_ee); post1 = 1.; post2 = 1."
 
         return ModelEquations(
